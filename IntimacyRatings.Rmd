@@ -1,0 +1,286 @@
+---
+title: "IntimacyRatings"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Prepare data
+
+```{r, echo=TRUE, results="hide"}
+library(tidyverse)
+library(lme4)
+library(viridis)
+```
+
+```{r}
+folder <- "C:/Users/tomof/Documents/1HU/ExperimentEyes/IntimacyRatings/"
+dat <- read.csv(paste0(folder, "CleanData.csv"))
+
+dat <- dat[dat$Stockholm=="Yes",] # keep only people who live in Stockholm
+dat$Stockholm <- NULL # we don't need this column anymore
+
+dat$Participant <- as.factor(dat$Participant)
+dat$Gender <- as.factor(dat$Gender)
+str(dat)
+```
+
+```{r}
+dat <- dat[dat$GrewUp!="no of your business",]
+dat$GrewUp[dat$GrewUp=="india"] <- "India"
+usa <- c("United States ", "US Virgin Islands ")
+dat$GrewUp[dat$GrewUp%in%usa] <- "USA"
+sweden <- c("sweden", "SE")
+dat$GrewUp[dat$GrewUp%in%sweden] <- "Sweden"
+dat$GrewUp[dat$GrewUp=="Mornaguia"] <- "Tunisia"
+uk <- c("United Kingdom ", "Uk")
+dat$GrewUp[dat$GrewUp%in%uk] <- "UK"
+dat$GrewUp[dat$GrewUp=="The Netherlands"] <- "Netherlands"
+dat$GrewUp <- trimws(dat$GrewUp, which="right")
+
+table(dat$GrewUp)
+```
+
+There seem to be around half Swedish and half foreign respondents.
+
+```{r}
+dat$Swedish[dat$GrewUp=="Sweden"] <- "Swedish"
+dat$Swedish[dat$GrewUp!="Sweden"] <- "NotSwedish"
+
+dat$Swedish <- as.factor(dat$Swedish)
+
+table(dat$Swedish)
+```
+
+Below I group the countries into world region, but *warning*: I followed my intuition for some of them, not an objective definition.
+
+```{r}
+asia <- c("India")
+southamerica <- c("Brazil", "Venezuela")
+northamerica <- c("USA", "Canada")
+westeurope <- c("Netherlands", "Belgium", "France", "Switzerland", "Germany", "Austria", "Ireland", "UK")
+easteurope <- c("Estonia", "Slovakia", "Romania", "Latvia")
+southeurope <- c("Greece", "Croatia", "Serbia", "Italy", "Spain", "Macedonia")
+africa <- c("South Africa", "Liberia", "Tunisia")
+oceania <- c("Australia")
+middleeast <- c("United Arab Emirates", "Cyprus", "Turkey", "Lebanon", "Saudi Arabia")
+
+dat$WorldRegion[dat$GrewUp %in% asia] <- "Asia"
+dat$WorldRegion[dat$GrewUp %in% southamerica] <- "South America"
+dat$WorldRegion[dat$GrewUp %in% northamerica] <- "North America"
+dat$WorldRegion[dat$GrewUp %in% westeurope] <- "Western Europe"
+dat$WorldRegion[dat$GrewUp %in% easteurope] <- "Eastern Europe"
+dat$WorldRegion[dat$GrewUp %in% southeurope] <- "Southern Europe"
+dat$WorldRegion[dat$GrewUp ==  "Sweden"] <- "Sweden"
+dat$WorldRegion[dat$GrewUp %in% africa] <- "Africa"
+dat$WorldRegion[dat$GrewUp %in% oceania] <- "Oceania"
+dat$WorldRegion[dat$GrewUp %in% middleeast] <- "Middle East"
+
+dat$WorldRegion <- as.factor(dat$WorldRegion)
+
+table(dat$WorldRegion)
+```
+
+```{r}
+dat$L1 <- trimws(dat$L1, which="right")
+dat$L1[dat$L1=="SE"] <- "Swedish"
+dat$L1[dat$L1=="English swedish"] <- "English, Swedish"
+
+unique(dat$L1)
+```
+
+```{r}
+dat$Age[dat$Age=="35 years"] <- 35
+dat$Age <- as.numeric(dat$Age)
+summary(dat$Age)
+sd(dat$Age)
+```
+```{r}
+table(dat$Gender)
+```
+
+```{r}
+questions <- cbind(qnames <- colnames(dat[c(6:33)]),
+                   qno <- paste0("Q", c(1:length(qnames)))) # save object with questions and their corresponding number
+
+names(dat)[c(6:33)] <- paste0(qno)
+dat[, c(6:33)] <- lapply(dat[, c(6:33)], as.numeric)
+head(dat)
+```
+
+# Analyze it
+
+## Per participant
+
+```{r}
+dl <- gather(dat, Question, Rating, Q1:Q28) # turn data into long format
+```
+
+### Gender
+
+See below: Gender doesn't seem to influence the ratings.
+
+```{r}
+summary(lmer(Rating ~ Gender + (1|Participant), data=dl))
+```
+
+### Age
+
+Age also doesn't seem to influence the ratings.
+
+```{r}
+summary(lmer(Rating ~ Age + (1|Participant), data=dl))
+```
+
+### Where they grew up
+
+The place where they come from doesn't seem to change their ratings too much, only people from Africa.
+
+Swedish people tended to rate the questions as slightly less intimate than foreigners.
+
+```{r}
+dl$WorldRegion <- relevel(dl$WorldRegion, ref=9) # making Sweden the reference level
+summary(lmer(Rating ~ WorldRegion + (1|Participant), data=dl))
+
+summary(lmer(Rating ~ Swedish + (1|Participant), data=dl))
+```
+
+### Individual ratings
+
+See the graph: some people rated the questions (almost) all the same. We should exclude those. (The colors in the graph don't mean anything, they're just pretty.)
+
+```{r}
+# png(paste0(folder, "IndividualRatings.png"), width=1000, height=1000)
+# ggplot(data=dl, aes(x=Question, y=Rating, color=Participant))+
+#   geom_point()+
+#   facet_wrap(~Participant)+
+#   theme(legend.position = "none", axis.title=element_text(size=23), axis.text.y=element_text(size=13), axis.text.x=element_blank())+
+#   scale_color_viridis_d()
+# dev.off()
+```
+
+At first I thought we could just calculate the standard deviation of each person's ratings, and then exclude those that are too low (as in code below), but this isn't a good strategy after all. After a visual inspection of the plot, I checked the SD of the participants I thought we should exclude, but it went up to 1.96 (this would leave us with less than 60 participants, i.e. less than half of the original sample size). Also, within this 1.96 group, some participants actually seem to have made real (reasonable) ratings.
+
+```{r}
+# Calculate standard deviation of each person's ratings
+
+SD <- aggregate(dl$Rating, by=list(dl$Participant), FUN=sd)
+colnames(SD) <- c("Participant", "SD")
+dl1 <- merge(dl, SD, by="Participant")
+
+hist(SD$SD)
+
+threshold <- mean(SD$SD) - (sd(SD$SD)*2)
+```
+
+Deleting participants by number of questions rated the same
+
+```{r}
+bad <- vector()
+
+for(i in dl$Participant){
+  if(any(count(dl$Rating[dl$Participant==i])$freq >= 20)){ # 20 is 70% of 28 questions
+    bad[i] <- i
+  }
+}
+
+bad
+
+`%!in%` <- Negate(`%in%`)
+dlr <- dl[dl$Participant %!in% bad,]
+dlbad <- dl[dl$Participant %in% bad,]
+```
+
+Now plot it again to see who's left...
+
+```{r}
+# png(paste0(folder, "IndividualRatingsReduced.png"), width=1000, height=1000)
+# ggplot(data=dlr, aes(x=Question, y=Rating, color=Participant))+
+#   geom_point()+
+#   facet_wrap(~Participant)+
+#   theme(legend.position = "none", axis.title=element_text(size=23), axis.text.y=element_text(size=13), axis.text.x=element_blank())+
+#   scale_color_viridis_d()
+# dev.off()
+# 
+# png(paste0(folder, "IndividualRatingsBad.png"), width=1000, height=1000)
+# ggplot(data=dlbad, aes(x=Question, y=Rating, color=Participant))+
+#   geom_point()+
+#   facet_wrap(~Participant)+
+#   theme(legend.position = "none", axis.title=element_text(size=23), axis.text.y=element_text(size=13), axis.text.x=element_blank())+
+#   scale_color_viridis_d()
+# dev.off()
+```
+
+And rename the participants so it's less confusing:
+
+```{r}
+dt <- dat[dat$Participant %!in% bad,] # we need to use the wide data format 
+
+dt$Participant <- 1:nrow(dt)
+
+# but now turn it into long again
+
+dl <- gather(dt, Question, Rating, Q1:Q28)
+```
+
+
+## Per question
+
+```{r}
+qratmean <- aggregate(dl$Rating, by=list(dl$Question), FUN=mean)
+colnames(qratmean) <- c("Q", "mean")
+qratmed <- aggregate(dl$Rating, by=list(dl$Question), FUN=median)
+colnames(qratmed) <- c("Q", "median")
+qratsd <- aggregate(dl$Rating, by=list(dl$Question), FUN=sd)
+colnames(qratsd) <- c("Q", "SD")
+qratg <- merge(qratmean, qratmed, by="Q")
+qrat <- merge(qratg, qratsd, by="Q")
+qrat$Q <- as.factor(qrat$Q)
+```
+
+Plotting the questions
+
+```{r}
+# folder2 <- "C:/Users/tomof/Documents/1.Humboldt-Universität_zu_Berlin/ExperimentEyes/IntimacyRatings/Questions/"
+# 
+# png(paste0(folder2, "QHist.png"), width=1000, height=1000)
+# ggplot(dl, aes(Rating))+
+#   geom_histogram()+
+#   facet_wrap(~Question)+
+#   ggtitle("Question ratings")+
+#   theme(axis.title=element_text(size=23), title=element_text(size=25))
+# dev.off()
+# 
+# plots <- list()
+# 
+# plots[[1]] <- ggplot(dl, aes(Rating))+
+#   geom_histogram()+
+#   ggtitle("Ratings of all questions")
+# 
+# plots[[2]] <- ggplot(qrat, aes(mean))+
+#   geom_histogram()+
+#   ggtitle("Mean ratings")
+# 
+# plots[[3]] <- ggplot(qrat, aes(median))+
+#   geom_histogram()+
+#   ggtitle("Medians of ratings")
+# 
+# plots[[4]] <- ggplot(qrat, aes(SD))+
+#   geom_histogram()+
+#   ggtitle("SD of ratings of each question (lots of variability)")
+# 
+# png(paste0(folder2, "Histograms.png"), width=1000, height=1000)
+# plot_grid(plotlist=plots)
+# dev.off()
+```
+
+```{r}
+colnames(questions) <- c("question", "Q")
+q <- merge(questions, qrat, by="Q")
+
+qByMean <- q[order(q$mean),] # the median is also already sorted, except for one case. so we can just leave it like that.
+
+write.csv(qByMean, file=paste0(folder, "OrderedQuestions.csv"))
+```
