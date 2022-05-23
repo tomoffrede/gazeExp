@@ -5,6 +5,8 @@ library(tuneR)
 library(tidyverse)
 library(rPraat)
 
+`%!in%` <- Negate(`%in%`) 
+
 folder <- "C:/Users/tomof/Documents/1HU/ExperimentEyes/Data/test/"
 
 filesWAV <- list.files(folder, "WAV")
@@ -96,12 +98,30 @@ f0$condition <- substr(f0$file, 1, 2)
 f0$task <- substr(f0$file, 4, 5)
 
 
+######################
 
+# check if all files are in the folder
 
+folder <- "C:/Users/tomof/Documents/1HU/ExperimentEyes/Data/"
 
+files <- list.files(folder)
+files <- files[!grepl("praat", files) & !grepl("test", files)]
 
+ftg <- files[grepl("TextGrid", files)]
+fwv <- files[grepl("WAV", files)]
 
+fwv[substr(fwv, 1, 9) %!in% substr(ftg, 1, 9)]
 
+all <- data.frame(cbind(ftg, fwv))
+all$worked[substr(fwv, 1, 9) == substr(ftg, 1, 9)] <- "worked!"
+all$worked[substr(fwv, 1, 9) != substr(ftg, 1, 9)] <- "NO!!!"
+unique(all$worked)
+
+all$speaker <- substr(all$ftg, 7, 9)
+length(unique(all$speaker)) # 33 speakers
+table(all$speaker) # all with 4 files (2 baselines and 2 conversations)
+
+# all files here :)
 
 
 
