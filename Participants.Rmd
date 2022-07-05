@@ -1,0 +1,48 @@
+---
+title: "Participants"
+output: html_document
+date: '2022-07-05'
+---
+
+```{r}
+library(tidyverse)
+folder <- "C:/Users/tomof/Documents/1HU/ExperimentEyes/Data/"
+meta <- list.files(folder, "csv")
+
+dat <- read.csv(paste0(folder, meta)) %>%
+  select("Participant", "Age", "Gender", "HearingImpairment", "SpeechImpairment", "Dyslexia", "VisionImpairment", "Education", "L1", "TMF.M1":"TMF.F6") %>%
+  mutate(TMF.M = (TMF.M1 + TMF.M2 + TMF.M3 + TMF.M4 + TMF.M5 + TMF.M6) / 6,
+         TMF.F = (TMF.F1 + TMF.F2 + TMF.F3 + TMF.F4 + TMF.F5 + TMF.F6) / 6) %>%
+  mutate_at(c("TMF.M", "TMF.F"), as.numeric) %>%
+  select(-c("TMF.M1":"TMF.F6"))
+names(dat)
+```
+
+```{r}
+length(dat$Participant) # 33 participants
+summary(dat$Age) # 21 - 56 yo ; median 29 ; M 30.55 ; SD 8.07
+sd(dat$Age)
+table(dat$Education) # 5 HS ; 6 BA ; 22 MA
+```
+
+```{r}
+table(dat$Gender) # 32 males; 1 not listed
+
+summary(dat$TMF.F) # 1.17 - 5 ; median 3.33 ; M 3.16 ; SD 0.88
+sd(dat$TMF.F, na.rm=TRUE)
+summary(dat$TMF.M) # 3.33 - 7 ; median 5.33 ; M 5.34 ; SD 0.9
+sd(dat$TMF.M)
+```
+
+```{r}
+sort(table(dat$L1), decreasing=TRUE)
+length(unique(dat$L1)) # 18 different languages
+# 7 swedish, 4 dutch, 3 french, 3 spanish, 2 english, 1 of each of the others
+```
+
+```{r}
+table(dat$HearingImpairment) # no hearing impairment
+table(dat$SpeechImpairment) # no speech impairment
+table(dat$Dyslexia) # 1 dyslexic
+table(dat$VisionImpairment) # 28 no vision impairment, 5 corrected-to-normal vision
+```
