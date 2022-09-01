@@ -2,15 +2,19 @@
 
 library(rPraat)
 library(tidyverse)
+library(lme4)
 `%!in%` <- Negate(`%in%`)
 
-folder <- "C:/Users/tomof/Documents/1HU/ExperimentEyes/Data/"
+folder <- "C:/Users/offredet/Documents/1HU/ExperimentEyes/Data/All/"
+
+# Objects so far in the code below containing data (if you want to combine them, you'll have to change some things in them so they look the same):
+# tD, tG, f0
 
 # TURNS
 
 # Get duration of each turn
 
-fTG <- list.files(folder, "TextGrid")
+fTG <- list.files(folder, "\\.TextGrid")
 fTGc <- fTG[substr(fTG, 4, 5) == "CO"] # only conversations! not baseline
 
 tD <- data.frame(matrix(nrow=0, ncol=4))
@@ -39,10 +43,14 @@ tD <- tD %>%
   mutate_at("turnDur", as.numeric)
 
 tD$condition <- substr(tD$file, 1, 2)
-tD$speaker <- substr(tD$file, 7, 9)
-summary(lmer(turnDur ~ condition + (1 | speaker), tD))
 
-# Get time between robot's and human's turns
+summary(lmer(turnDur ~ condition + (1 | speaker), tD %>% filter(substr(speaker, 1, 2) != "R-")))
+# doing this regression with only the humans' data shows no significant difference in turn durations (t = -1.627)
+# but if we include robots too, then t = -2.706. If the robots didn't contribute to the effect,
+# I'd expect them to vary in duration randomly, and either maintain the same |t| value or reduce it.
+# But if it increased, it could be that the experimenter was behaving differently in each condition.
+
+# Get duration of gap between robot's and human's turns
 
 tG <- data.frame(matrix(nrow=0, ncol=4))
 names(tG) <- c("file", "turnPairType", "turnPair", "gap")
@@ -100,14 +108,86 @@ tG <- tG %>%
   mutate_at(c("file", "turnPairType", "turnPair"), as.factor) %>%
   mutate_at("gap", as.numeric)
 
+tG$condition <- substr(tG$file, 1, 2)
+
+summary(lmer(gap ~ condition + (1 | file), tG))
+# gap duration didn't vary per condition
 
 
+# ACOUSTICS
 
+## (taken from AudioData.R)
 
+filesTG <- list.files(folder, "\\.TextGrid")
+filesTG <- filesTG[!grepl("VUV", filesTG)]
+filesTXT <- list.files(folder, "txt")
+filesTXT <- filesTXT[!grepl("Register", filesTXT)]
 
+files <- data.frame(cbind(filesTG, filesTXT))
+files <- files %>%
+  mutate(worked = ifelse(substr(files$filesTG, 1, 9) == substr(files$filesTXT, 1, 9), "worked!", "NO!!!!"))
 
+f0 <- data.frame(matrix(nrow=0, ncol=6))
+names(f0) <- c("file", "speaker", "turn", "onset", "offset", "f0mean")
 
+# do something like the following, but also calculating f0 mean per IPU (not entire turn)
 
+for(i in 1:nrow(files)){
+  tg <- tg.read(paste0(folder, files$filesTG[[i]]), encoding=detectEncoding(paste0(folder, files$filesTG[[i]])))
+  txt <- read.table(paste0(folder, files$filesTXT[[i]]), header=TRUE, na.strings = "--undefined--")
+  turnCount <- 0
+  
+  if(substr(files$filesTG[i], 4, 5) == "BL"){ # baseline speech!
+    # get f0 mean for entire period? for time windows? get transcription?
+    # for now just get the mean for the entire period
+    start <- as.numeric(tg.getIntervalStartTime(tg, "speech", as.numeric(tg.findLabels(tg, "speech", "baseline"))))
+    end <- as.numeric(tg.getIntervalEndTime(tg, "speech", as.numeric(tg.findLabels(tg, "speech", "baseline"))))
+    f <- (txt %>%
+            filter(onset >= start & offset <= end) %>%
+            summarize(f = mean(f0mean, na.rm=TRUE)))[1,1] # "[1,1]" because `f` is a 1x1 matrix data frame
+    f0[nrow(f0)+1,] <- c(substr(files$filesTG[i], 1, 9),
+                         substr(files$filesTG[i], 7, 9),
+                         "baseline",
+                         start,
+                         end,
+                         as.numeric(f))
+    
+  } else if(substr(files$filesTG[i], 4, 5) == "CO"){ # conversation
+    for(n in 1:tg.getNumberOfIntervals(tg, "participant")){
+      if(tg.getLabel(tg, "participant", n) == "s"){
+        turnCount <- turnCount + 1
+        turnOnset <- as.numeric(tg.getIntervalStartTime(tg, "participant", n))
+        turnOffset <- as.numeric(tg.getIntervalEndTime(tg, "participant", n))
+        f <- (txt %>%
+                filter(onset >= turnOnset & offset <= turnOffset) %>%
+                summarize(f = mean(f0mean, na.rm=TRUE)))[1,1] # "[1,1]" because `f` is a 1x1 matrix data frame
+        f0[nrow(f0)+1,] <- c(substr(files$filesTG[i], 1, 9),
+                             substr(files$filesTG[i], 7, 9),
+                             turnCount,
+                             turnOnset,
+                             turnOffset,
+                             as.numeric(f))
+      }
+    }
+    for(n in 1:tg.getNumberOfIntervals(tg, "robot")){
+      if(tg.getLabel(tg, "robot", n) == "s"){
+        turnCount <- turnCount + 1
+        turnOnset <- as.numeric(tg.getIntervalStartTime(tg, "robot", n))
+        turnOffset <- as.numeric(tg.getIntervalEndTime(tg, "robot", n))
+        f <- (txt %>%
+                filter(onset >= turnOnset & offset <= turnOffset) %>%
+                summarize(f = mean(f0mean, na.rm=TRUE)))[1,1] # "[1,1]" because `f` is a 1x1 matrix data frame
+        f0[nrow(f0)+1,] <- c(substr(files$filesTG[i], 1, 9),
+                             paste0(substr(files$filesTG[i], 7, 9), "-Robot"),
+                             turnCount,
+                             turnOnset,
+                             turnOffset,
+                             as.numeric(f))
+      }
+    }
+  }
+}
 
-
+f0$condition <- substr(f0$file, 1, 2)
+f0$task <- substr(f0$file, 4, 5)
 

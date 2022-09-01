@@ -7,7 +7,7 @@ library(rPraat)
 
 `%!in%` <- Negate(`%in%`) 
 
-folder <- "C:/Users/tomof/Documents/1HU/ExperimentEyes/Data/test/"
+folder <- "C:/Users/offredet/Documents/1HU/ExperimentEyes/Data/test/"
 
 filesWAV <- list.files(folder, "WAV")
 
@@ -102,15 +102,15 @@ f0$task <- substr(f0$file, 4, 5)
 
 # check if all files are in the folder
 
-folder <- "C:/Users/tomof/Documents/1HU/ExperimentEyes/Data/"
+folder <- "C:/Users/offredet/Documents/1HU/ExperimentEyes/Data/"
 
-files <- list.files(folder)
-files <- files[!grepl("praat", files) & !grepl("test", files)]
+files <- list.files(folder, "\\.WAV|\\.TextGrid")
 
 ftg <- files[grepl("TextGrid", files)]
 fwv <- files[grepl("WAV", files)]
 
 fwv[substr(fwv, 1, 9) %!in% substr(ftg, 1, 9)]
+fwv[substr(ftg, 1, 9) %!in% substr(fwv, 1, 9)] # both of these should be empty -- it means all the WAVs have texgrids and vice-versa
 
 all <- data.frame(cbind(ftg, fwv))
 all$worked[substr(fwv, 1, 9) == substr(ftg, 1, 9)] <- "worked!"
@@ -123,14 +123,4 @@ table(all$speaker) # all with 4 files (2 baselines and 2 conversations)
 
 # all files here :)
 
-
-
-
-
-
-
-
-
-
-
-
+################
