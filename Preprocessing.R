@@ -127,8 +127,8 @@ files <- data.frame(cbind(filesTG, filesTXT))
 files <- files %>%
   mutate(worked = ifelse(substr(files$filesTG, 1, 9) == substr(files$filesTXT, 1, 9), "worked!", "NO!!!!"))
 
-f0 <- data.frame(matrix(nrow=0, ncol=6))
-names(f0) <- c("file", "speaker", "turn", "onset", "offset", "f0mean")
+f0 <- data.frame(matrix(nrow=0, ncol=7))
+names(f0) <- c("file", "speaker", "turn", "IPU", "onsetIPU", "offsetIPU", "f0mean")
 
 # do something like the following, but also calculating f0 mean per IPU (not entire turn)
 
@@ -138,20 +138,24 @@ for(i in 1:nrow(files)){
   turnCount <- 0
   
   if(substr(files$filesTG[i], 4, 5) == "BL"){ # baseline speech!
-    # get f0 mean for entire period? for time windows? get transcription?
-    # for now just get the mean for the entire period
-    start <- as.numeric(tg.getIntervalStartTime(tg, "speech", as.numeric(tg.findLabels(tg, "speech", "baseline"))))
-    end <- as.numeric(tg.getIntervalEndTime(tg, "speech", as.numeric(tg.findLabels(tg, "speech", "baseline"))))
-    f <- (txt %>%
-            filter(onset >= start & offset <= end) %>%
-            summarize(f = mean(f0mean, na.rm=TRUE)))[1,1] # "[1,1]" because `f` is a 1x1 matrix data frame
-    f0[nrow(f0)+1,] <- c(substr(files$filesTG[i], 1, 9),
-                         substr(files$filesTG[i], 7, 9),
-                         "baseline",
-                         start,
-                         end,
-                         as.numeric(f))
-    
+    startBL <- as.numeric(tg.getIntervalStartTime(tg, "speech", as.numeric(tg.findLabels(tg, "speech", "baseline"))))
+    endBL <- as.numeric(tg.getIntervalEndTime(tg, "speech", as.numeric(tg.findLabels(tg, "speech", "baseline"))))
+    for(p in 1:tg.getNumberOfIntervals(tg, "IPU")){
+      if(tg.getLabel(tg, "IPU", p)==""){ # if the interval is labeled as empty (vs. as "xxx"), it means it's an IPU
+        startIPU <- as.numeric(tg.getIntervalStartTime(tg, "IPU", p))
+        endIPU <- as.numeric(tg.getIntervalEndTime(tg, "IPU", p))
+        f <- (txt %>%
+                filter(onset >= startIPU & offset <= endIPU) %>%
+                summarize(f = mean(f0mean, na.rm=TRUE)))[1,1] # "[1,1]" because `f` is a 1x1 matrix data frame
+        f0[nrow(f0)+1,] <- c(substr(files$filesTG[i], 1, 9),
+                             substr(files$filesTG[i], 7, 9),
+                             "baseline",
+                             p,
+                             startIPU,
+                             endIPU,
+                             as.numeric(f))
+      }
+    }
   } else if(substr(files$filesTG[i], 4, 5) == "CO"){ # conversation
     for(n in 1:tg.getNumberOfIntervals(tg, "participant")){
       if(tg.getLabel(tg, "participant", n) == "s"){
@@ -187,6 +191,8 @@ for(i in 1:nrow(files)){
     }
   }
 }
+
+# turn the IPU numbers into 1:n per speaker per file
 
 f0$condition <- substr(f0$file, 1, 2)
 f0$task <- substr(f0$file, 4, 5)
