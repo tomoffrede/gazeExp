@@ -228,6 +228,9 @@ f0 <- f0 %>%
   mutate(condition = substr(file, 1, 2),
          task = ifelse(substr(file, 4, 5) == "BL", "Baseline", "Conversation"))
 
+# save this because this for loop takes literal hours!
+save(f0, file=paste0(folder, "f0.RData"))
+
 ###############
 ###############
 ###############
@@ -235,7 +238,7 @@ f0 <- f0 %>%
 # check if f0 was extracted correctly
 # also show in the plot if there are NAs
 
-f0 <- fo %>% 
+f0 <- f0 %>% 
   mutate(participant = substr(file, 7, 9), # variable with name of speaker including for the robot subsets
          groupings = paste0(speaker, condition, task))
 
@@ -243,14 +246,22 @@ f0$participant <- substr(f0$file, 7, 9)
 f0$groupings <- paste0(f0$speaker, f0$condition, f0$task)
 
 for(i in unique(f0$participant)){
-  dat <- f0 %>% filter(participant == i)
-  ggplot(dat, aes(IPU, f0mean))+
-    geom_line()+
-    facet_wrap(~groupings)
+  dat0 <- f0 %>% filter(participant == i)
+  par(mfrow=c(3, 2))
+  for(g in unique(dat0$groupings)){
+    dat <- dat0 %>% filter(groupings == g)
+    plot(dat$IPU, dat$f0mean, type="l", main=g)
+  }
   readline("Enter to continue")
 }
 
+# lots of weird data!
 
+# calculate proportion of NA
+
+f0 <- f0 %>% 
+  group_by(speaker, task, turn) %>% 
+  mutate(NAprop = count())
 
 
 
