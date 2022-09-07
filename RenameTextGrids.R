@@ -2,19 +2,20 @@
 
 library(rPraat)
 
-folder <- "C:/Users/tomof/Documents/1HU/ExperimentEyes/Data/"
-folder2 <- "C:/Users/tomof/Documents/1HU/ExperimentEyes/Data/renamed/"
+folder <- "C:/Users/offredet/Documents/1HU/ExperimentEyes/Data/AllWAV/"
+folder2 <- "C:/Users/offredet/Documents/1HU/ExperimentEyes/Data/AllWAV/renamed/"
 
 files <- list.files(folder, "TextGrid")
-files <- files[grepl("\\(", files)]
+# files <- files[grepl("\\(", files)]
 
 for(i in files){
-  if(grepl("(1)", i)){
-    newName <- gsub(" \\(1\\)", "", i)
-  } else if(grepl("(2)", i)){
-    newName <- gsub(" \\(2\\)", "", i)
-  }
-  
+  # if(grepl("(1)", i)){
+  #   newName <- gsub(" \\(1\\)", "", i)
+  # } else if(grepl("(2)", i)){
+  #   newName <- gsub(" \\(2\\)", "", i)
+  # }
+  newName <- gsub("\\.TextGrid", "_pauses.TextGrid", i)
+
   old <- tg.read(paste0(folder, i), encoding=detectEncoding(paste0(folder, i)))
   tg.write(old, paste0(folder2, newName))
 }
