@@ -131,7 +131,7 @@ f0 <- data.frame(matrix(nrow=0, ncol=11))
 names(f0) <- c("file", "speaker", "turn", "turnOnset", "turnOffset", "turnDur", "IPU", "IPUOnset", "IPUOffset", "IPUDur", "f0mean")
 
 # do something like the following, but also calculating f0 mean per IPU (not entire turn)
-
+startTime <- Sys.time()
 for(i in 1:nrow(files)){
   tg <- tg.read(paste0(folder, files$filesTG[[i]]), encoding=detectEncoding(paste0(folder, files$filesTG[[i]])))
   txt <- read.table(paste0(folder, files$filesTXT[[i]]), header=TRUE, na.strings = "--undefined--")
@@ -226,7 +226,11 @@ for(i in 1:nrow(files)){
 
 f0 <- f0 %>% 
   mutate(condition = substr(file, 1, 2),
-         task = ifelse(substr(file, 4, 5) == "BL", "Baseline", "Conversation"))
+         task = ifelse(substr(file, 4, 5) == "BL", "Baseline", "Conversation"),
+         f0mean = ifelse(f0mean == "NaN", NA, f0mean))
+
+endTime <- Sys.time()
+print("Time to create `f0` dataset;", endTime-startTime)
 
 # save this because this for loop takes literal hours!
 save(f0, file=paste0(folder, "f0.RData"))
@@ -238,39 +242,52 @@ save(f0, file=paste0(folder, "f0.RData"))
 # check if f0 was extracted correctly
 # also show in the plot if there are NAs
 
+load(paste0(folder, "f0.RData"))
+
 f0 <- f0 %>% 
   mutate(participant = substr(file, 7, 9), # variable with name of speaker including for the robot subsets
-         groupings = paste0(speaker, condition, task))
+         groupings = paste(speaker, condition, task, sep = "."))
 
-f0$participant <- substr(f0$file, 7, 9)
-f0$groupings <- paste0(f0$speaker, f0$condition, f0$task)
-
-for(i in unique(f0$participant)){
-  dat0 <- f0 %>% filter(participant == i)
-  par(mfrow=c(3, 2))
-  for(g in unique(dat0$groupings)){
-    dat <- dat0 %>% filter(groupings == g)
-    plot(dat$IPU, dat$f0mean, type="l", main=g)
-  }
-  readline("Enter to continue")
-}
+# for(i in unique(f0$participant)){
+#   dat0 <- f0 %>% filter(participant == i)
+#   par(mfrow=c(3, 2))
+#   for(g in unique(dat0$groupings)){
+#     dat <- dat0 %>% filter(groupings == g)
+#     plot(dat$IPU, dat$f0mean, type="l", main=g)
+#   }
+#   readline("Enter to continue")
+# }
 
 # lots of weird data!
 
 # calculate proportion of NA
+# 
+# f0 <- f0 %>% 
+#   group_by(speaker, condition, task, turn) %>% 
+#   mutate(NAprop = sum(is.na(f0mean)) / n()) %>% 
+#   ungroup()
+# 
+# t <- f0 %>% 
+#   mutate(tgroup = paste(speaker, condition, task, turn, collapse = "."))
+# length(unique(t$tgroup))
+# length(unique(f0$NAprop))
 
-f0 <- f0 %>% 
-  group_by(speaker, task, turn) %>% 
-  mutate(NAprop = count())
+# make empty file
+# for: each grouping, make a new file, calculate things, add it to empty file
 
+c <- data.frame(matrix(nrow=0, ncol=4))
+names(c) <- c("turn", "f0mean", "groupings", "NAprop")
 
+for(g in unique(f0$groupings)){
+  c0 <- f0 %>% 
+    filter(groupings == g) %>% 
+    select(turn, f0mean, groupings) %>%
+    mutate(NAprop = sum(is.na(f0mean)) / n())
+  c <- rbind(c, c0)
+}
 
-
-
-
-
-
-
-
-
+startTime <- Sys.time()
+f0a <- full_join(f0, c, by=c("groupings", "turn", "f0mean"), all=TRUE)
+endTime <- Sys.time()
+endTime-startTime
 
