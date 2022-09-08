@@ -227,7 +227,8 @@ for(i in 1:nrow(files)){
 f0 <- f0 %>% 
   mutate(condition = substr(file, 1, 2),
          task = ifelse(substr(file, 4, 5) == "BL", "Baseline", "Conversation"),
-         f0mean = ifelse(f0mean == "NaN", NA, f0mean))
+         f0mean = ifelse(f0mean == "NaN", NA, f0mean)) %>% 
+  mutate_at(f0mean, as.numeric)
 
 endTime <- Sys.time()
 print("Time to create `f0` dataset;", endTime-startTime)
@@ -248,15 +249,15 @@ f0 <- f0 %>%
   mutate(participant = substr(file, 7, 9), # variable with name of speaker including for the robot subsets
          groupings = paste(speaker, condition, task, sep = "."))
 
-# for(i in unique(f0$participant)){
-#   dat0 <- f0 %>% filter(participant == i)
-#   par(mfrow=c(3, 2))
-#   for(g in unique(dat0$groupings)){
-#     dat <- dat0 %>% filter(groupings == g)
-#     plot(dat$IPU, dat$f0mean, type="l", main=g)
-#   }
-#   readline("Enter to continue")
-# }
+for(i in unique(f0$participant)){
+  dat0 <- f0 %>% filter(participant == i)
+  par(mfrow=c(3, 2))
+  for(g in unique(dat0$groupings)){
+    dat <- dat0 %>% filter(groupings == g)
+    plot(dat$IPU, dat$f0mean, type="l", main=g)
+  }
+  readline("Enter to continue")
+}
 
 # lots of weird data!
 
@@ -272,9 +273,6 @@ f0 <- f0 %>%
 # length(unique(t$tgroup))
 # length(unique(f0$NAprop))
 
-# make empty file
-# for: each grouping, make a new file, calculate things, add it to empty file
-
 c <- data.frame(matrix(nrow=0, ncol=4))
 names(c) <- c("turn", "f0mean", "groupings", "NAprop")
 
@@ -286,8 +284,31 @@ for(g in unique(f0$groupings)){
   c <- rbind(c, c0)
 }
 
-startTime <- Sys.time()
 f0a <- full_join(f0, c, by=c("groupings", "turn", "f0mean"), all=TRUE)
-endTime <- Sys.time()
-endTime-startTime
+f0a <- f0a %>% distinct()
+# na <- f0a[!duplicated(f0a$groupings)]
+na <- f0a %>% distinct(groupings, .keep_all=TRUE)
+hist(na$NAprop)
+
+# exclude f0 higher than 2.5 SD
+
+n <- data.frame(matrix(nrow=0, ncol=4))
+names(n) <- c("turn", "f0mean", "groupings", "f0z")
+
+for(g in unique(f0a$groupings)){
+  n0 <- f0a %>% 
+    filter(groupings == g) %>% 
+    select(turn, f0mean, groupings) %>%
+    mutate(f0z = (f0mean - mean(f0mean, na.rm=TRUE))/sd(f0mean, na.rm=TRUE))
+  n <- rbind(n, n0)
+}
+
+f0b <- full_join(f0a, n, by=c("groupings", "turn", "f0mean"), all=TRUE)
+f0b <- f0b %>% distinct()
+f0b <- f0b %>% filter(abs(f0z) < 2.5)
+
+# from here: create new variable with the f0 of partner's previous turn (f0 mean I guess)
+# do same for MFCCs
+# then do UBB-UGM (???) models with MFCCs
+
 
