@@ -18,9 +18,11 @@ sp <- unique(all$speaker)
 
 # now copy the .txt files from the individual folders into the All folder
 
-# folderSpeakers <- "C:/Users/offredet/Documents/1HU/ExperimentEyes/Data/PerSpeaker/"
-# folderAll <- "C:/Users/offredet/Documents/1HU/ExperimentEyes/Data/All/"
-# 
+folderSpeakers <- "C:/Users/offredet/Documents/1HU/ExperimentEyes/Data/OneChannel/PerSpeaker/"
+folderAll <- "C:/Users/offredet/Documents/1HU/ExperimentEyes/Data/OneChannel/"
+
+# sp <- c("AMO", "BHH", "CVZ", "DHI", "DMT", "FQD")
+
 # for(s in sp){
 #   folderCurrentSpeaker <- paste0(folderSpeakers, s, "/")
 #   files <- list.files(folderCurrentSpeaker, "\\.txt")
@@ -30,10 +32,25 @@ sp <- unique(all$speaker)
 # }
 
 # copy only WAV files from All folder to another AllWAV folder
+# 
+# folderAll <- "C:/Users/offredet/Documents/1HU/ExperimentEyes/Data/All/"
+# folderAllWAV <- "C:/Users/offredet/Documents/1HU/ExperimentEyes/Data/AllWAV/"
+# 
+# files <- list.files(folderAll, "\\.WAV")
+# files <- paste0(folderAll, files)
+# file.copy(files, folderAllWAV)
 
-folderAll <- "C:/Users/offredet/Documents/1HU/ExperimentEyes/Data/All/"
-folderAllWAV <- "C:/Users/offredet/Documents/1HU/ExperimentEyes/Data/AllWAV/"
+# copy files from an "all" folder to their respective speakers' individual folders
 
 files <- list.files(folderAll, "\\.WAV")
-files <- paste0(folderAll, files)
-file.copy(files, folderAllWAV)
+
+for(i in files){
+  for(s in sp){
+    folderCurrentSpeaker <- paste0(folderSpeakers, s, "/")
+    if(grepl(s, i)){
+      file <- paste0(folderAll, i, "/")
+      file.copy(file, folderCurrentSpeaker)
+    }
+  }
+}
+
