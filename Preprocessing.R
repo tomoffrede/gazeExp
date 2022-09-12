@@ -228,10 +228,10 @@ f0 <- f0 %>%
   mutate(condition = substr(file, 1, 2),
          task = ifelse(substr(file, 4, 5) == "BL", "Baseline", "Conversation"),
          f0mean = ifelse(f0mean == "NaN", NA, f0mean)) %>% 
-  mutate_at(f0mean, as.numeric)
+  mutate_at("f0mean", as.numeric)
 
 endTime <- Sys.time()
-print("Time to create `f0` dataset;", endTime-startTime)
+endTime-startTime
 
 # save this because this for loop takes literal hours!
 save(f0, file=paste0(folder, "f0.RData"))
