@@ -9,6 +9,8 @@ knitr::opts_chunk$set(echo = TRUE)
 
 # Prepare data
 
+## Note: If you want to save any of the plots from this code, you have to comment out the `png()` and `dev.off()` lines before and after the plot code, and you have to make sure `folder` (and `folder2`) are the right ones where you want your graphs saved.
+
 ```{r, echo=TRUE, results="hide"}
 library(tidyverse)
 library(lme4)
@@ -16,7 +18,7 @@ library(viridis)
 ```
 
 ```{r}
-folder <- "C:/Users/tomof/Documents/1HU/ExperimentEyes/IntimacyRatings/"
+folder <- "C:/Users/offredet/Documents/1HU/ExperimentEyes/IntimacyRatings/"
 dat <- read.csv(paste0(folder, "CleanData.csv"))
 
 dat <- dat[dat$Stockholm=="Yes",] # keep only people who live in Stockholm
@@ -153,11 +155,11 @@ See the graph: some people rated the questions (almost) all the same. We should 
 
 ```{r}
 # png(paste0(folder, "IndividualRatings.png"), width=1000, height=1000)
-# ggplot(data=dl, aes(x=Question, y=Rating, color=Participant))+
-#   geom_point()+
-#   facet_wrap(~Participant)+
-#   theme(legend.position = "none", axis.title=element_text(size=23), axis.text.y=element_text(size=13), axis.text.x=element_blank())+
-#   scale_color_viridis_d()
+ggplot(data=dl, aes(x=Question, y=Rating, color=Participant))+
+  geom_point()+
+  facet_wrap(~Participant)+
+  theme(legend.position = "none", axis.title=element_text(size=23), axis.text.y=element_text(size=13), axis.text.x=element_blank())+
+  scale_color_viridis_d()
 # dev.off()
 ```
 
@@ -180,8 +182,8 @@ Deleting participants by number of questions rated the same
 ```{r}
 bad <- vector()
 
-for(i in dl$Participant){
-  if(any(count(dl$Rating[dl$Participant==i])$freq >= 20)){ # 20 is 70% of 28 questions
+for(i in unique(dl$Participant)){
+  if(any(data.frame(table(dl$Rating[dl$Participant==i]))$Freq >= 20)){ # 20 is 70% of 28 questions
     bad[i] <- i
   }
 }
@@ -197,19 +199,19 @@ Now plot it again to see who's left...
 
 ```{r}
 # png(paste0(folder, "IndividualRatingsReduced.png"), width=1000, height=1000)
-# ggplot(data=dlr, aes(x=Question, y=Rating, color=Participant))+
-#   geom_point()+
-#   facet_wrap(~Participant)+
-#   theme(legend.position = "none", axis.title=element_text(size=23), axis.text.y=element_text(size=13), axis.text.x=element_blank())+
-#   scale_color_viridis_d()
+ggplot(data=dlr, aes(x=Question, y=Rating, color=Participant))+
+  geom_point()+
+  facet_wrap(~Participant)+
+  theme(legend.position = "none", axis.title=element_text(size=23), axis.text.y=element_text(size=13), axis.text.x=element_blank())+
+  scale_color_viridis_d()
 # dev.off()
 # 
 # png(paste0(folder, "IndividualRatingsBad.png"), width=1000, height=1000)
-# ggplot(data=dlbad, aes(x=Question, y=Rating, color=Participant))+
-#   geom_point()+
-#   facet_wrap(~Participant)+
-#   theme(legend.position = "none", axis.title=element_text(size=23), axis.text.y=element_text(size=13), axis.text.x=element_blank())+
-#   scale_color_viridis_d()
+ggplot(data=dlbad, aes(x=Question, y=Rating, color=Participant))+
+  geom_point()+
+  facet_wrap(~Participant)+
+  theme(legend.position = "none", axis.title=element_text(size=23), axis.text.y=element_text(size=13), axis.text.x=element_blank())+
+  scale_color_viridis_d()
 # dev.off()
 ```
 
@@ -246,11 +248,11 @@ Plotting the questions
 # folder2 <- "C:/Users/tomof/Documents/1.Humboldt-Universität_zu_Berlin/ExperimentEyes/IntimacyRatings/Questions/"
 # 
 # png(paste0(folder2, "QHist.png"), width=1000, height=1000)
-# ggplot(dl, aes(Rating))+
-#   geom_histogram()+
-#   facet_wrap(~Question)+
-#   ggtitle("Question ratings")+
-#   theme(axis.title=element_text(size=23), title=element_text(size=25))
+ggplot(dl, aes(Rating))+
+  geom_histogram()+
+  facet_wrap(~Question)+
+  ggtitle("Question ratings")+
+  theme(axis.title=element_text(size=23), title=element_text(size=25))
 # dev.off()
 # 
 # plots <- list()
