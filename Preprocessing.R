@@ -49,6 +49,8 @@ summary(lmer(turnDur ~ condition + (1 | speaker), tD %>% filter(substr(speaker, 
 # but if we include robots too, then t = -2.706. If the robots didn't contribute to the effect,
 # I'd expect them to vary in duration randomly, and either maintain the same |t| value or reduce it.
 # But if it increased, it could be that the experimenter was behaving differently in each condition.
+# voices: one was slower and one faster. we tried to counterbalance them across orders but it wasn't a perfect balance (something like 20-30)
+# this could be the source for the effect 
 
 # Get duration of gap between robot's and human's turns
 
@@ -142,53 +144,74 @@ for(i in 1:nrow(files)){
     endBL <- as.numeric(tg.getIntervalEndTime(tg, "speech", as.numeric(tg.findLabels(tg, "speech", "baseline"))))
     for(p in 1:tg.getNumberOfIntervals(tg, "IPU")){
       if(tg.getLabel(tg, "IPU", p)==""){ # if the interval is labeled as empty (vs. as "xxx"), it means it's an IPU
-        ipuCount <- ipuCount + 1
         startIPU <- as.numeric(tg.getIntervalStartTime(tg, "IPU", p))
         endIPU <- as.numeric(tg.getIntervalEndTime(tg, "IPU", p))
-        f <- (txt %>%
-                filter(onset >= startIPU & offset <= endIPU) %>%
-                summarize(f = mean(f0mean, na.rm=TRUE)))[1,1] # "[1,1]" because `f` is a 1x1 matrix data frame
-        f0[nrow(f0)+1,] <- c(substr(files$filesTG[i], 1, 9),
-                             substr(files$filesTG[i], 7, 9),
-                             "baseline", # "turn"
-                             startBL,
-                             endBL,
-                             as.numeric(endBL - startBL), # duration of entire baseline
-                             ipuCount,
-                             startIPU,
-                             endIPU,
-                             as.numeric(endIPU - startIPU), # duration of IPU
-                             as.numeric(f))
+        if(startBL <= startIPU){ # doing two separate if() statements because there's some confusion with the use of &(&)
+          if(endBL >= endIPU){
+            ipuCount <- ipuCount + 1
+            f <- data.frame(matrix(nrow=0, ncol=1))
+            names(f) <- c("f0")
+            for(l in 1:nrow(txt)){
+              if(txt$onset[l] >= startIPU){
+                if(txt$offset[l] <= endIPU){
+                  f[nrow(f)+1,] <- as.numeric(txt$f0mean[l])
+                }
+              }
+            }
+            f0mean <- mean(f$f0, na.rm=TRUE)  
+            f0[nrow(f0)+1,] <- c(substr(files$filesTG[i], 1, 9),
+                                 substr(files$filesTG[i], 7, 9),
+                                 "baseline", # "turn"
+                                 startBL,
+                                 endBL,
+                                 as.numeric(endBL - startBL), # duration of entire baseline
+                                 ipuCount,
+                                 startIPU,
+                                 endIPU,
+                                 as.numeric(endIPU - startIPU), # duration of IPU
+                                 as.numeric(f0mean))
+          }
+        } 
       }
     }
   } else if(substr(files$filesTG[i], 4, 5) == "CO"){ # conversation
-    turnCount <- 0
+    turnCountHuman <- 0
+    turnCountRobot <- 0
     for(n in 1:tg.getNumberOfIntervals(tg, "participant")){
       if(tg.getLabel(tg, "participant", n) == "s"){
         ipuCount <- 0
-        turnCount <- turnCount + 1
+        turnCountHuman <- turnCountHuman + 1
         turnOnset <- as.numeric(tg.getIntervalStartTime(tg, "participant", n))
         turnOffset <- as.numeric(tg.getIntervalEndTime(tg, "participant", n))
         for(p in 1:tg.getNumberOfIntervals(tg, "IPU")){
           if(tg.getLabel(tg, "IPU", p)==""){ # if the interval is labeled as empty (vs. as "xxx"), it means it's an IPU
-            ipuCount <- ipuCount + 1
             startIPU <- as.numeric(tg.getIntervalStartTime(tg, "IPU", p))
             endIPU <- as.numeric(tg.getIntervalEndTime(tg, "IPU", p))
-            if(txt$onset >= startIPU & txt$offset <= endIPU){
-              f <- (txt %>%
-                      filter(onset >= startIPU & offset <= endIPU) %>%
-                      summarize(f = mean(f0mean, na.rm=TRUE)))[1,1] # "[1,1]" because `f` is a 1x1 matrix data frame
-              f0[nrow(f0)+1,] <- c(substr(files$filesTG[i], 1, 9),
-                                   substr(files$filesTG[i], 7, 9),
-                                   turnCount,
-                                   turnOnset,
-                                   turnOffset,
-                                   as.numeric(turnOffset - turnOnset), # duration of turn
-                                   ipuCount,
-                                   startIPU,
-                                   endIPU,
-                                   as.numeric(endIPU - startIPU), # duration of IPU
-                                   as.numeric(f))
+            if(turnOnset <= startIPU){ # doing two separate if() statements because there's some confusion with the use of &(&)
+              if(turnOffset >= endIPU){
+                ipuCount <- ipuCount + 1
+                f <- data.frame(matrix(nrow=0, ncol=1))
+                names(f) <- c("f0")
+                for(l in 1:nrow(txt)){
+                  if(txt$onset[l] >= startIPU){
+                    if(txt$offset[l] <= endIPU){
+                      f[nrow(f)+1,] <- as.numeric(txt$f0mean[l])
+                    }
+                  }
+                }
+                f0mean <- mean(f$f0, na.rm=TRUE)
+                f0[nrow(f0)+1,] <- c(substr(files$filesTG[i], 1, 9),
+                                     substr(files$filesTG[i], 7, 9),
+                                     turnCountHuman,
+                                     turnOnset,
+                                     turnOffset,
+                                     as.numeric(turnOffset - turnOnset), # duration of turn
+                                     ipuCount,
+                                     startIPU,
+                                     endIPU,
+                                     as.numeric(endIPU - startIPU), # duration of IPU
+                                     as.numeric(f0mean))
+              }
             }
           }
         }
@@ -197,29 +220,38 @@ for(i in 1:nrow(files)){
     for(n in 1:tg.getNumberOfIntervals(tg, "robot")){
       if(tg.getLabel(tg, "robot", n) == "s"){
         ipuCount <- 0
-        turnCount <- turnCount + 1
+        turnCountRobot <- turnCountRobot + 1
         turnOnset <- as.numeric(tg.getIntervalStartTime(tg, "robot", n))
         turnOffset <- as.numeric(tg.getIntervalEndTime(tg, "robot", n))
         for(p in 1:tg.getNumberOfIntervals(tg, "IPU")){
           if(tg.getLabel(tg, "IPU", p)==""){ # if the interval is labeled as empty (vs. as "xxx"), it means it's an IPU
-            ipuCount <- ipuCount + 1
             startIPU <- as.numeric(tg.getIntervalStartTime(tg, "IPU", p))
             endIPU <- as.numeric(tg.getIntervalEndTime(tg, "IPU", p))
-            if(txt$onset >= startIPU & txt$offset <= endIPU){
-              f <- (txt %>%
-                      filter(onset >= startIPU & offset <= endIPU) %>%
-                      summarize(f = mean(f0mean, na.rm=TRUE)))[1,1] # "[1,1]" because `f` is a 1x1 matrix data frame
-              f0[nrow(f0)+1,] <- c(substr(files$filesTG[i], 1, 9),
-                                   paste0(substr(files$filesTG[i], 7, 9), "-Robot"),
-                                   turnCount,
-                                   turnOnset,
-                                   turnOffset,
-                                   as.numeric(turnOffset - turnOnset), # duration of turn
-                                   ipuCount,
-                                   startIPU,
-                                   endIPU,
-                                   as.numeric(endIPU - startIPU), # duration of IPU
-                                   as.numeric(f))
+            if(turnOnset <= startIPU){
+              if(turnOffset >= endIPU){
+                ipuCount <- ipuCount + 1
+                f <- data.frame(matrix(nrow=0, ncol=1))
+                names(f) <- c("f0")
+                for(l in 1:nrow(txt)){
+                  if(txt$onset[l] >= startIPU){ # doing two separate if() statements because there's some confusion with the use of &(&)
+                    if(txt$offset[l] <= endIPU){
+                      f[nrow(f)+1,] <- as.numeric(txt$f0mean[l])
+                    }
+                  }
+                }
+                f0mean <- mean(f$f0, na.rm=TRUE)
+                f0[nrow(f0)+1,] <- c(substr(files$filesTG[i], 1, 9),
+                                     paste0(substr(files$filesTG[i], 7, 9), "-Robot"),
+                                     turnCountRobot,
+                                     turnOnset,
+                                     turnOffset,
+                                     as.numeric(turnOffset - turnOnset), # duration of turn
+                                     ipuCount,
+                                     startIPU,
+                                     endIPU,
+                                     as.numeric(endIPU - startIPU), # duration of IPU
+                                     as.numeric(f0mean))
+              }
             }
           }
         }
@@ -237,7 +269,6 @@ f0 <- f0 %>%
 endTime <- Sys.time()
 endTime-startTime
 
-# save this because this for loop takes literal hours!
 save(f0, file=paste0(folder, "f0.RData"))
 
 ###############
@@ -248,16 +279,6 @@ save(f0, file=paste0(folder, "f0.RData"))
 # also show in the plot if there are NAs
 
 load(paste0(folder, "f0.RData"))
-
-####check
-
-ch <- f0 %>% filter(speaker=="AMO", condition=="NG", task=="Conversation")
-a <- ch %>% filter(turn==1)
-b <- ch %>% filter(turn==2)
-c <- ch %>% filter(turn==3)
-d <- ch %>% filter(turn==4)
-
-#### end of check
 
 f0 <- f0 %>% 
   mutate(participant = substr(file, 7, 9), # variable with name of speaker including for the robot subsets
@@ -277,11 +298,11 @@ f0 <- f0 %>%
 
 # calculate proportion of NA
 
-f0 <- f0 %>%
-  # group_by(speaker, condition, task) %>%
-  group_by(groupings) %>%
-  mutate(NAprop = sum(is.na(f0mean)) / n()) %>%
-  ungroup()
+# f0 <- f0 %>%
+#   # group_by(speaker, condition, task) %>%
+#   group_by(groupings) %>%
+#   mutate(NAprop = sum(is.na(f0mean)) / n()) %>%
+#   ungroup()
 
 # length(unique(f0$NAprop))
 # length(unique(f0$groupings))
@@ -364,29 +385,21 @@ dat <- dat %>%
  
 dat <- merge(dat, dt, by="tgroup")
 
-# why does even this group it by file and not tgroup??????
-
-  
-  
-  
-  
-  
-  
-  
-  
-  
-
-
-
-
-
-
-
-ch <- dat[,c(1:3, 18,19)]
-
 dat$prevf0 <- NA
 
-for(i in 2:nrow(dat)){
-  dat$prevf0[i] <- NA
-}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
