@@ -7,118 +7,15 @@ library(lme4)
 
 folder <- "C:/Users/offredet/Documents/1HU/ExperimentEyes/Data/All/"
 
-# Objects so far in the code below containing data (if you want to combine them, you'll have to change some things in them so they look the same):
-# tD, tG, f0
-
-# TURNS
-
-# Get duration of each turn
-
-fTG <- list.files(folder, "\\.TextGrid")
-fTGc <- fTG[substr(fTG, 4, 5) == "CO"] # only conversations! not baseline
-
-tD <- data.frame(matrix(nrow=0, ncol=4))
-names(tD) <- c("file", "speaker", "turn", "turnDur")
-
-# i=fTGc[[1]]
-
-for(i in fTGc){
-  tg <- tg.read(paste0(folder, i), encoding=detectEncoding(paste0(folder, i)))
-  for(n in 1:tg.getNumberOfIntervals(tg, "participant")){
-    tD[nrow(tD)+1,] <- c(gsub(".TextGrid", "", i), # file name
-                         substr(i, 7, 9), # participant's name
-                         n, # number of turn
-                         tg.getIntervalDuration(tg, "participant", n)) # duration of turn
-  }
-  for(n in 1:tg.getNumberOfIntervals(tg, "robot")){
-    tD[nrow(tD)+1,] <- c(gsub(".TextGrid", "", i), # file name
-                         paste0("R-", substr(i, 7, 9)), # robot's name
-                         n, # number of turn
-                         tg.getIntervalDuration(tg, "robot", n)) # duration of turn
-  }
-}
-
-tD <- tD %>%
-  mutate_at(c("file", "speaker", "turn"), as.factor) %>%
-  mutate_at("turnDur", as.numeric)
-
-tD$condition <- substr(tD$file, 1, 2)
-
-summary(lmer(turnDur ~ condition + (1 | speaker), tD %>% filter(substr(speaker, 1, 2) != "R-")))
+# (referring to a previously written regression with turnDuration ~ Condition:)
 # doing this regression with only the humans' data shows no significant difference in turn durations (t = -1.627)
 # but if we include robots too, then t = -2.706. If the robots didn't contribute to the effect,
 # I'd expect them to vary in duration randomly, and either maintain the same |t| value or reduce it.
 # But if it increased, it could be that the experimenter was behaving differently in each condition.
 # voices: one was slower and one faster. we tried to counterbalance them across orders but it wasn't a perfect balance (something like 20-30)
-# this could be the source for the effect 
+# this could be the source for the effect
 
-# Get duration of gap between robot's and human's turns
-
-tG <- data.frame(matrix(nrow=0, ncol=4))
-names(tG) <- c("file", "turnPairType", "turnPair", "gap")
-
-
-# only non-overlapping turns
-
-for(i in fTGc){
-  tg <- tg.read(paste0(folder, i), encoding=detectEncoding(paste0(folder, i)))
-  
-  for(p in 1:tg.getNumberOfIntervals(tg, "participant")){ # first, remove all the participant's turns that overlap with the robot's turn
-    for(r in 1:tg.getNumberOfIntervals(tg, "robot")){
-      if(tg.getLabel(tg, "participant", p) == "s" & tg.getLabel(tg, "robot", r) == "s"){
-        if(tg.getIntervalStartTime(tg, "participant", p) > tg.getIntervalStartTime(tg, "robot", r) & tg.getIntervalEndTime(tg, "participant", p) < tg.getIntervalEndTime(tg, "robot", r)){
-          tg.setLabel(tg, "participant", p, "")
-          tg.removeIntervalBothBoundaries(tg, "participant", p)
-        }
-      }
-    }
-  }
-  
-  gaps1 <- data.frame(matrix(nrow=0, ncol=4))
-  names(gaps1) <- c("file", "turnPairType", "turnPair", "gap")
-  
-  for(p in 1:tg.getNumberOfIntervals(tg, "participant")){
-    if(tg.getLabel(tg, "participant", p) == "s"){
-      gaps1[nrow(gaps1)+1,] <- c(gsub(".TextGrid", "", i), # file name
-                               "Robot-Human", # turn pair type (Robot-Human or Human-Robot)
-                               p, # number of RH turn pair
-                               as.numeric(tg.getIntervalStartTime(tg, "participant", p)) - as.numeric(tg.getIntervalEndTime(tg, "robot", p))) # start of participant's turn minus end robot's previous turn
-    }
-  }
-  
-  gaps1 <- gaps1 %>% mutate(turnPair = 1:nrow(gaps1))
-
-  gaps2 <- data.frame(matrix(nrow=0, ncol=4))
-  names(gaps2) <- c("file", "turnPairType", "turnPair", "gap")
-  
-  for(r in 4:tg.getNumberOfIntervals(tg, "robot")){
-    if(tg.getLabel(tg, "robot", r) == "s"){
-      gaps2[nrow(gaps2)+1,] <- c(gsub(".TextGrid", "", i), # file name
-                               "Human-Robot", # turn pair type (Robot-Human or Human-Robot)
-                               p, # number of HR turn pair
-                               as.numeric(tg.getIntervalStartTime(tg, "robot", r)) - as.numeric(tg.getIntervalEndTime(tg, "participant", r-2))) # start of participant's turn minus end robot's previous turn
-    }
-  }
-  
-  gaps2 <- gaps2 %>% mutate(turnPair = 1:nrow(gaps2))
-  gaps <- rbind(gaps1, gaps2)
-  
-  tG <- rbind(tG, gaps)
-}
-
-tG <- tG %>%
-  mutate_at(c("file", "turnPairType", "turnPair"), as.factor) %>%
-  mutate_at("gap", as.numeric)
-
-tG$condition <- substr(tG$file, 1, 2)
-
-summary(lmer(gap ~ condition + (1 | file), tG))
-# gap duration didn't vary per condition
-
-
-# ACOUSTICS
-
-## (adapted from AudioData.R)
+## (part of it adapted from AudioData.R)
 
 filesTG <- list.files(folder, "\\.TextGrid")
 filesTG <- filesTG[!grepl("VUV", filesTG)]
@@ -385,21 +282,63 @@ dat <- dat %>%
  
 dat <- merge(dat, dt, by="tgroup")
 
-dat$prevf0 <- NA
+dat <- dat %>% 
+  mutate(interlocutor = ifelse(nchar(speaker)==3, paste0(speaker, "-Robot"), substr(speaker, 1, 3)),
+         prevf0 = NA,
+         gapDur = NA)
 
+d0 <- dat
+# dat <- d0
 
+# add metadata
 
+folder2 <- "C:/Users/offredet/Documents/1HU/ExperimentEyes/Data/"
+file <- list.files(folder2, "\\.csv")
+file <- file[grepl("metadata", file)]
 
+m <- read.csv(paste0(folder2, file)) %>% 
+  rename(participant = Participant)
 
+dam <- merge(dat, m, by="participant")
 
+# calculate prevf0, i.e. the average f0 of the interlocutor's previous turn
+# for the baseline, prevf0 is the average of all the first robot's turns (prevf0 in `baseline` only exists for the second baseline)
+# also calculate gapDur, i.e. the gap (in seconds) between the interlocutor's previous turn and speaker's current turn
 
+t <- dam %>%
+  mutate_at("f0turn", as.numeric) %>% 
+  filter(grepl("Robot", speaker)) %>% 
+  group_by(speaker, condition) %>% 
+  summarize(mean = mean(f0turn, na.rm=TRUE)) %>% 
+  ungroup()
 
+dam <- dam %>% 
+  mutate(prevCond = substr(Order, 1, 2)) %>% 
+  mutate(prevCond = ifelse(condition == prevCond, NA, prevCond))
 
+for(i in 1:nrow(dam)){
+  if(nchar(dam$speaker[i]) == 3){ # if the speaker is human
+    if(dam$task[i] == "Conversation"){ # if it's during the conversation (vs baseline)
+      dam$prevf0[i] <- dam$f0turn[dam$speaker == dam$interlocutor[i] &
+                                    dam$turn == dam$turn[i] &
+                                    dam$condition == dam$condition[i]]
+      prevEnd <- as.numeric(dam$turnOffset[dam$speaker == dam$interlocutor[i] &
+                                  dam$turn == dam$turn[i] &
+                                  dam$condition == dam$condition[i]])
+      dam$gapDur[i] <- as.numeric(dam$turnOffset[i]) - prevEnd
+    }
+    if(dam$task[i] == "Baseline"){
+      dam$prevf0[i] <- t$mean[t$speaker == dam$interlocutor[i] &
+                                t$condition == dam$prevCond[i]]
+        
+    }
+  }
+}
+# we don't need to calculate `prevf0` for the robot, because the robot's speech wasn't influeced by the human anyway
 
+dam <- dam %>% 
+  select(-c("tgroup", "groupings"))
 
+# still have to do something with the questionnaire data
 
-
-
-
-
-
+save(dam, file = paste0(folder, "data.RData"))

@@ -1,0 +1,118 @@
+---
+title: "Analysis Speech"
+author: "Tom Offrede"
+date: "2022-09-15"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, include=FALSE}
+library(tidyverse)
+library(lme4)
+
+`%!in%` <- Negate(`%in%`)
+
+folder <- "C:/Users/offredet/Documents/1HU/ExperimentEyes/Data/All/"
+file <- list.files(folder, "RData")
+file <- file[[1]]
+
+load(paste0(folder, file))
+
+dam <- dam %>% 
+  mutate_at(c("turnDur", "f0turn", "prevf0", "gapDur"), as.numeric) %>% 
+  mutate_at(c("speaker", "turn", "condition", "Order", "task"), as.factor)
+```
+
+# Gap Duration
+
+```{r}
+ggplot(dam, aes(condition, gapDur))+
+  geom_boxplot()
+```
+
+
+The model `gap duration ~ condition` is slightly better than the one that includes `order` (the order of conditions in each participant, i.e. if it was GA or NG first).
+
+But still, **no effect of condition on the duration of between-turn gaps**.
+
+```{r}
+summary(g1 <- lmer(gapDur ~ condition + (1 + condition | speaker), dam))
+summary(g2 <- lmer(gapDur ~ condition + Order + (1 + condition | speaker), dam))
+anova(g1, g2)
+```
+
+# Turn Duration
+
+```{r}
+ggplot(dam %>% filter(!grepl("Robot", speaker), task == "Conversation"), aes(condition, turnDur))+
+  geom_boxplot()
+```
+
+The model with `order` isn't better than the one without.
+
+Turns are slightly longer during GA condition, but |t| is only around 1.
+
+```{r}
+summary(t1 <- lmer(turnDur ~ condition + (1 | speaker), dam %>% filter(!grepl("Robot", speaker), task == "Conversation")))
+summary(t2 <- lmer(turnDur ~ condition + Order + (1 | speaker), dam %>% filter(!grepl("Robot", speaker), task == "Conversation")))
+anova(t1, t2)
+```
+
+# f0
+
+```{r}
+ggplot(dam, aes(prevf0, f0turn))+
+  geom_point()+
+  facet_wrap(~condition)
+```
+
+
+Again, `order` doesn't improve the model.
+
+There doesn't seem to be an effect on f0 of interlocutor's previous turn's f0 or of its interaction with condition.
+The model only with prevf0 and without condition also doesn't give a significant effect
+
+```{r}
+summary(f1 <- lmer(f0turn ~ prevf0 * condition + (1 + condition | speaker), dam %>% filter(!grepl("Robot", speaker), task == "Conversation")))
+summary(f2 <- lmer(turnDur ~ prevf0 * condition + Order + (1 + condition | speaker), dam %>% filter(!grepl("Robot", speaker), task == "Conversation")))
+anova(f1, f2)
+
+summary(f1a <- lmer(f0turn ~ prevf0 + (1 | speaker), dam %>% filter(!grepl("Robot", speaker), task == "Conversation")))
+```
+
+# f0 during baseline
+
+(Is this the plot I want?)
+ 
+```{r}
+ggplot(dam %>% filter(!grepl("Robot", speaker), task == "Baseline"), aes(prevf0, f0turn))+
+  geom_point()+
+  facet_wrap(~condition)
+```
+
+
+```{r}
+summary(fb1 <- lm(f0turn ~ prevf0 * condition, dam %>% filter(!grepl("Robot", speaker), task == "Baseline")))
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
