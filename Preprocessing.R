@@ -161,7 +161,11 @@ f0 <- f0 %>%
   mutate(condition = substr(file, 1, 2),
          task = ifelse(substr(file, 4, 5) == "BL", "Baseline", "Conversation"),
          f0mean = ifelse(f0mean == "NaN", NA, f0mean)) %>% 
-  mutate_at("f0mean", as.numeric)
+  mutate_at("f0mean", as.numeric) %>% 
+  filter(!is.na(f0mean)) %>% 
+  group_by(speaker, condition, task, turn) %>% 
+  mutate(IPU = 1:n()) %>% 
+  ungroup()
 
 endTime <- Sys.time()
 endTime-startTime
@@ -248,47 +252,89 @@ f0b <- full_join(f0, n, by=c("groupings", "turn", "f0mean"), all=TRUE)
 f0b <- f0b %>% distinct()
 f0b <- f0b %>% filter(abs(f0z) < 2.5)
 
-# from here: create new variable with the f0 of partner's previous turn (f0 mean I guess)
-
 dat <- f0b
+
+# for each turn of the human, save `prevf0`, i.e. the f0 of the robot's previous turn
+# for the first IPU of the human, prevf0 is the f0 of the robot's last IPU in the previous turn. human's second IPU is robot's second-to-last IPU u.s.w
+
+# the following loop transforms the robot's IPUs into invIPUs, to match the IPUs of the human later
+
+
+r <- data.frame(matrix(nrow=0, ncol=5))
+names(r) <- c("speaker", "turn", "IPU", "condition", "invIPU")
+
+for(s in unique(dat$speaker[grepl("Robot", dat$speaker)])){
+  for(c in unique(dat$condition)){
+    for(t in unique(dat$turn[dat$task=="Conversation" & dat$speaker==s & dat$condition==c])){
+      r0 <- dat %>% 
+        filter(speaker == s, 
+               condition == c,
+               turn == t) %>%
+        select(c(speaker, turn, IPU, condition)) %>% 
+        mutate_at("IPU", as.numeric) %>%
+        mutate(invIPU = n():1)
+      r <- rbind(r, r0)
+    }
+  }
+}
+
+
+dat <- full_join(dat, r, by=c("speaker", "turn", "IPU", "condition"))
+
+# now do a different dataset and create column `overallIPUs`, which are all the IPUs of the robot without dividing them by turn. this will serve for the `prevf0` of the baseline
+
+
+b <- data.frame(matrix(nrow=0, ncol=5))
+names(b) <- c("speaker", "IPU", "f0mean", "condition", "overallIPU")
+
+for(s in unique(dat$speaker[grepl("Robot", dat$speaker)])){
+  for(c in unique(dat$condition)){
+      b0 <- dat %>% 
+        filter(speaker == s, 
+               condition == c) %>%
+        select(c(speaker, IPU, f0mean, condition)) %>% 
+        mutate_at("IPU", as.numeric) %>%
+        mutate(overallIPU = n():1)
+      b <- rbind(b, b0)
+  }
+}
+
+# datsave <- dat
+# dat <- datsave
+
+
+# the following was calculating the average f0 of each turn to then use it for `prevf0`
+# I'm not using this anymore for the `prevf0` of the conversations, but will keep it for the `prevf0` of the baseline
+
 
 # calculate mean f0 per turn
 # (mean f0 of entire baseline for BL files)
 # save that as the f0 of the interlocutor's following turn
-
+ 
 dat$tgroup <- paste(dat$groupings, dat$turn, sep=".")
 
-# dt <- dat %>% # trying to get the mean per turn (per speaker per task per condition), but this code keeps grouping the dataset by file, not by `tgroup`
-#   group_by(tgroup) %>% 
-#   summarize(f0turn = mean(f0mean, na.rm=TRUE)) %>% # i've also tried with mutate()
-#   ungroup() #%>% 
-  # select(-c("f0mean", "f0z", "IPU", "IPUOnset", "IPUOffset", "IPUDur")) %>% 
-  # distinct()
+# dt <- data.frame(matrix(nrow=0, ncol=2))
+# names(dt) <- c("tgroup", "f0turn")
+# 
+# t=unique(dat$tgroup[!grepl("baseline", dat$tgroup)])[[5]]
+# 
+# for(t in unique(dat$tgroup)){
+#   d <- dat %>%
+#     filter(tgroup == t)
+#   dt[nrow(dt)+1,] <- c(t, mean(d$f0mean, na.rm=TRUE))
+# }
+# 
+# dat <- merge(dat, dt, by="tgroup")
 
-dt <- data.frame(matrix(nrow=0, ncol=2))
-names(dt) <- c("tgroup", "f0turn")
+# to get the `prevf0` for the baseline, turn all the previous robot's IPUs into one long list of IPUs (not divided by turn),
+# then do invIPU like for the conversation
 
-t=unique(dat$tgroup[!grepl("baseline", dat$tgroup)])[[5]]
 
-for(t in unique(dat$tgroup)){
-  d <- dat %>% 
-    filter(tgroup == t)
-  dt[nrow(dt)+1,] <- c(t, mean(d$f0mean, na.rm=TRUE))
-}
-
-dat <- dat %>% 
-  select(-c("f0mean", "f0z", "IPU", "IPUOnset", "IPUOffset", "IPUDur")) %>% 
-  distinct()
- 
-dat <- merge(dat, dt, by="tgroup")
 
 dat <- dat %>% 
   mutate(interlocutor = ifelse(nchar(speaker)==3, paste0(speaker, "-Robot"), substr(speaker, 1, 3)),
          prevf0 = NA,
          gapDur = NA)
-
-d0 <- dat
-# dat <- d0
 
 # add metadata
 
@@ -300,41 +346,55 @@ m <- read.csv(paste0(folder2, file)) %>%
   rename(participant = Participant)
 
 dam <- merge(dat, m, by="participant")
+  
 
 # calculate prevf0, i.e. the average f0 of the interlocutor's previous turn
 # for the baseline, prevf0 is the average of all the first robot's turns (prevf0 in `baseline` only exists for the second baseline)
 # also calculate gapDur, i.e. the gap (in seconds) between the interlocutor's previous turn and speaker's current turn
 
-t <- dam %>%
-  mutate_at("f0turn", as.numeric) %>% 
-  filter(grepl("Robot", speaker)) %>% 
-  group_by(speaker, condition) %>% 
-  summarize(mean = mean(f0turn, na.rm=TRUE)) %>% 
-  ungroup()
+# t <- dam %>%
+#   filter(grepl("Robot", speaker)) %>%
+#   group_by(speaker, condition) %>% 
+#   summarize(mean = mean(f0mean, na.rm=TRUE)) %>%
+#   ungroup()
 
 dam <- dam %>% 
   mutate(prevCond = substr(Order, 1, 2)) %>% 
   mutate(prevCond = ifelse(condition == prevCond, NA, prevCond))
 
-for(i in 1:nrow(dam)){
-  if(nchar(dam$speaker[i]) == 3){ # if the speaker is human
-    if(dam$task[i] == "Conversation"){ # if it's during the conversation (vs baseline)
-      dam$prevf0[i] <- dam$f0turn[dam$speaker == dam$interlocutor[i] &
-                                    dam$turn == dam$turn[i] &
-                                    dam$condition == dam$condition[i]]
-      prevEnd <- as.numeric(dam$turnOffset[dam$speaker == dam$interlocutor[i] &
-                                  dam$turn == dam$turn[i] &
-                                  dam$condition == dam$condition[i]])
-      dam$gapDur[i] <- as.numeric(dam$turnOffset[i]) - prevEnd
-    }
-    if(dam$task[i] == "Baseline"){
-      dam$prevf0[i] <- t$mean[t$speaker == dam$interlocutor[i] &
-                                t$condition == dam$prevCond[i]]
-        
+dab <- dam %>% filter(task == "Baseline") # Baseline dataset
+dac <- dam %>% filter(task == "Conversation") # Conversation dataset
+
+dac <- dac[!grepl("TMF|BFI|GA|NG|Impairment|Dyslexia|Gender|Education|L1|Age", names(dam))]
+
+for(i in 1:nrow(dac)){ # getting `prevf0` for the Conversation dataset
+  if(nchar(dac$speaker[i]) == 3){ # if the speaker is human
+    if(dac$task[i] == "Conversation"){ # if it's during the conversation (vs baseline)
+      if(is.logical(dac$f0mean[dac$speaker == dac$interlocutor[i] &
+                    dac$turn == dac$turn[i] &
+                    dac$condition == dac$condition[i] &
+                    dac$invIPU == dac$IPU[i]])){
+        dac$prevf0[i] <- dac$f0mean[dac$speaker == dac$interlocutor[i] &
+                                      dac$turn == dac$turn[i] &
+                                      dac$condition == dac$condition[i] &
+                                      dac$invIPU == dac$IPU[i]]
+      }
+      prevEnd <- as.numeric(dac$turnOffset[dac$speaker == dac$interlocutor[i] &
+                                             dac$turn == dac$turn[i] &
+                                             dac$condition == dac$condition[i]])
+      dac$gapDur[i] <- as.numeric(dac$turnOffset[i]) - prevEnd
     }
   }
 }
-# we don't need to calculate `prevf0` for the robot, because the robot's speech wasn't influeced by the human anyway
+
+for(i in 1:nrow(dab)){
+  dab$prevf0[i] <- b$f0mean[b$speaker == dab$interlocutor[i] &
+                              b$condition == dab$condition[i] &
+                              b$overallIPU == dab$IPU[i]]
+}
+
+
+# we don't need to calculate `prevf0` for the robot, because the robot's speech wasn't influenced by the human anyway
 
 dam <- dam %>% 
   select(-c("tgroup", "groupings"))
