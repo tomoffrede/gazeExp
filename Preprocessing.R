@@ -392,7 +392,9 @@ for(i in 1:nrow(dab)){
                            b$condition == dab$prevCond[i] &
                            b$overallIPU == dab$IPU[i]]
   if(!purrr::is_empty(previousf0)){
-    dab$prevf0[i] <- previousf0
+    if(!any(is.na(previousf0))){
+      dab$prevf0[i] <- previousf0
+    }
   }
 }
 
