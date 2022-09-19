@@ -362,10 +362,12 @@ dam <- dam %>%
   mutate(prevCond = substr(Order, 1, 2)) %>% 
   mutate(prevCond = ifelse(condition == prevCond, NA, prevCond))
 
-dab <- dam %>% filter(task == "Baseline") # Baseline dataset
+dab <- dam %>% filter(task == "Baseline") %>% # Baseline dataset
+  select(-c("turn", "invIPU", "gapDur"))
 dac <- dam %>% filter(task == "Conversation") # Conversation dataset
 
-dac <- dac[!grepl("TMF|BFI|GA|NG|Impairment|Dyslexia|Gender|Education|L1|Age", names(dam))]
+dac <- dac[!grepl("TMF|BFI|GA|NG|Impairment|Dyslexia|Gender|Education|L1|Age", names(dac))]
+dab <- dab[!grepl("TMF|BFI|GA|NG|Impairment|Dyslexia|Gender|Education|L1|Age", names(dab))]
 
 for(i in 1:nrow(dac)){ # getting `prevf0` for the Conversation dataset
   if(nchar(dac$speaker[i]) == 3){ # if the speaker is human
@@ -377,26 +379,34 @@ for(i in 1:nrow(dac)){ # getting `prevf0` for the Conversation dataset
       if(!purrr::is_empty(previousf0)){
         dac$prevf0[i] <- previousf0
       }
-      prevEnd <- as.numeric(dac$turnOffset[dac$speaker == dac$interlocutor[i] &
+      prevEnd <- as.numeric(unique(dac$turnOffset[dac$speaker == dac$interlocutor[i] &
                                              dac$turn == dac$turn[i] &
-                                             dac$condition == dac$condition[i]])
+                                             dac$condition == dac$condition[i]]))
       dac$gapDur[i] <- as.numeric(dac$turnOffset[i]) - prevEnd
     }
   }
 }
 
 for(i in 1:nrow(dab)){
-  dab$prevf0[i] <- b$f0mean[b$speaker == dab$interlocutor[i] &
-                              b$condition == dab$condition[i] &
-                              b$overallIPU == dab$IPU[i]]
+  previousf0 <- b$f0mean[b$speaker == dab$interlocutor[i] &
+                           b$condition == dab$prevCond[i] &
+                           b$overallIPU == dab$IPU[i]]
+  if(!purrr::is_empty(previousf0)){
+    dab$prevf0[i] <- previousf0
+  }
 }
-
 
 # we don't need to calculate `prevf0` for the robot, because the robot's speech wasn't influenced by the human anyway
 
-dam <- dam %>% 
-  select(-c("tgroup", "groupings"))
+dL <- list(dab, dac)
+for(d in 1:length(dL)){
+  dL[[d]] <- dL[[d]] %>% 
+    select(-c("tgroup", "groupings"))
+}
+dab <- dL[[1]]
+dac <- dL[[2]]
 
 # still have to do something with the questionnaire data
 
-save(dam, file = paste0(folder, "data.RData"))
+save(dac, file = paste0(folder, "dataConversation.RData"))
+save(dab, file = paste0(folder, "dataBaseline.RData"))
