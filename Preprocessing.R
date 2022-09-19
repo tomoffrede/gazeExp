@@ -366,8 +366,8 @@ dab <- dam %>% filter(task == "Baseline") %>% # Baseline dataset
   select(-c("turn", "invIPU", "gapDur"))
 dac <- dam %>% filter(task == "Conversation") # Conversation dataset
 
-dac <- dac[!grepl("TMF|BFI|GA|NG|Impairment|Dyslexia|Gender|Education|L1|Age", names(dac))]
-dab <- dab[!grepl("TMF|BFI|GA|NG|Impairment|Dyslexia|Gender|Education|L1|Age", names(dab))]
+# dac <- dac[!grepl("TMF|BFI|GA|NG|Impairment|Dyslexia|Gender|Education|L1|Age", names(dac))]
+# dab <- dab[!grepl("TMF|BFI|GA|NG|Impairment|Dyslexia|Gender|Education|L1|Age", names(dab))]
 
 for(i in 1:nrow(dac)){ # getting `prevf0` for the Conversation dataset
   if(nchar(dac$speaker[i]) == 3){ # if the speaker is human
@@ -387,6 +387,8 @@ for(i in 1:nrow(dac)){ # getting `prevf0` for the Conversation dataset
   }
 }
 
+dab$prevf0Mock <- NA
+
 for(i in 1:nrow(dab)){
   previousf0 <- b$f0mean[b$speaker == dab$interlocutor[i] &
                            b$condition == dab$prevCond[i] &
@@ -394,6 +396,16 @@ for(i in 1:nrow(dab)){
   if(!purrr::is_empty(previousf0)){
     if(!any(is.na(previousf0))){
       dab$prevf0[i] <- previousf0
+    }
+  }
+  if(dab$condition[i] == substr(dab$Order[i], 1, 2)){
+    previousf0Mock <- b$f0mean[b$speaker == dab$interlocutor[i] &
+                                 b$condition == dab$condition[i] &
+                                 b$overallIPU == dab$IPU[i]]
+    if(!purrr::is_empty(previousf0Mock)){
+      if(!any(is.na(previousf0Mock))){
+        dab$prevf0Mock[i] <- previousf0Mock
+      }
     }
   }
 }
@@ -412,3 +424,4 @@ dac <- dL[[2]]
 
 save(dac, file = paste0(folder, "dataConversation.RData"))
 save(dab, file = paste0(folder, "dataBaseline.RData"))
+
