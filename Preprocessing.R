@@ -370,14 +370,12 @@ dac <- dac[!grepl("TMF|BFI|GA|NG|Impairment|Dyslexia|Gender|Education|L1|Age", n
 for(i in 1:nrow(dac)){ # getting `prevf0` for the Conversation dataset
   if(nchar(dac$speaker[i]) == 3){ # if the speaker is human
     if(dac$task[i] == "Conversation"){ # if it's during the conversation (vs baseline)
-      if(is.logical(dac$f0mean[dac$speaker == dac$interlocutor[i] &
-                    dac$turn == dac$turn[i] &
-                    dac$condition == dac$condition[i] &
-                    dac$invIPU == dac$IPU[i]])){
-        dac$prevf0[i] <- dac$f0mean[dac$speaker == dac$interlocutor[i] &
-                                      dac$turn == dac$turn[i] &
-                                      dac$condition == dac$condition[i] &
-                                      dac$invIPU == dac$IPU[i]]
+      previousf0 <- dac$f0mean[dac$speaker == dac$interlocutor[i] &
+                                 dac$turn == dac$turn[i] &
+                                 dac$condition == dac$condition[i] &
+                                 dac$invIPU == dac$IPU[i]]
+      if(!purrr::is_empty(previousf0)){
+        dac$prevf0[i] <- previousf0
       }
       prevEnd <- as.numeric(dac$turnOffset[dac$speaker == dac$interlocutor[i] &
                                              dac$turn == dac$turn[i] &
