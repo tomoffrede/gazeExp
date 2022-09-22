@@ -2,7 +2,11 @@
 title: "Analysis Speech"
 author: "Tom Offrede"
 date: "2022-09-15"
-output: html_document
+output:
+  html_document:
+    toc: true
+    toc_float: 
+      collapsed: false
 ---
 
 ```{r setup, include=FALSE}
@@ -24,7 +28,7 @@ load(paste0(folder, fileConv))
 load(paste0(folder, fileBase))
 
 dac <- dac %>%
-  mutate_at(c("turnDur", "turn", "f0mean", "prevf0", "gapDur"), as.numeric) %>%
+  mutate_at(c("turnDur", "turn", "f0mean", "robPrevf0", "gapDur"), as.numeric) %>%
   mutate_at(c("speaker", "condition", "Order", "task"), as.factor)
 
 dab <- dab %>%
@@ -66,10 +70,10 @@ Turns are slightly longer during GA condition, but |t| is only around 1.
 summary(t1 <- lmer(turnDur ~ condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
 ```
 
-# f0
+# f0 during conversation
 
 ```{r}
-ggplot(dac, aes(prevf0, f0mean))+
+ggplot(dac, aes(robPrevf0, f0mean))+
   geom_point()+
   facet_wrap(~condition)
 
@@ -82,39 +86,39 @@ ggplot(dac, aes(turn, f0mean))+
 Again, `order` doesn't improve the model.
 
 There doesn't seem to be an effect on f0 of interlocutor's previous turn's f0 or of its interaction with condition.
-The model only with `prevf0` and without condition also doesn't give a significant effect.
+The model only with `robPrevf0` and without condition also doesn't give a significant effect.
 
 The `turn` effect suggests that people speak with lower f0 the further into the conversation, but there are also considerably fewer data points the further into the conversation (see graph above), so that could be the reason for this apparent effect.
 
 ```{r}
-summary(f1 <- lmer(f0mean ~ (prevf0 + condition + turn)^2 + (1 | speaker), dac %>% filter(!grepl("Robot", speaker))))
+summary(f1 <- lmer(f0mean ~ (robPrevf0 + condition + turn)^2 + (1 | speaker), dac %>% filter(!grepl("Robot", speaker))))
 ```
 
 # f0 during baseline
 
 ```{r}
-ggplot(dab, aes(prevf0, f0mean))+
+ggplot(dab, aes(robPrevf0, f0mean))+
   geom_point()+
   facet_wrap(~condition)
 ```
 
-The results from this regression model would suggest that people's f0 during their second baseline were predicted by the f0 of the robots they interacted with in the previous conversation. But the other regression model futher below also suggests the same thing happens, except that that second model is based on f0 data from a robot that the participant hadn't interacted with yet.
+The results from this regression model would suggest that people's f0 during their second baseline were predicted by the f0 of the robots they interacted with in the previous conversation. But the other regression model further below also suggests the same thing happens, except that that second model is based on f0 data from a robot that the participant hadn't interacted with yet. (There's a difference in the coefficients of `robPrevf0` depending on whether you use `GA` or `NG` as the reference condition.)
 
 Overall, I think this just means that the robots' and the humans' f0 are somehow close, but it doesn't mean the human converged to the robot.
 
 ```{r}
 dab$condition <- relevel(dab$condition, ref="GA")
-summary(fb1 <- lm(f0mean ~ prevf0 * condition, dab))
+summary(fb1 <- lmer(f0mean ~ robPrevf0 * condition + (0 + condition | speaker), dab))
 ```
 ```{r}
-ggplot(dab, aes(prevf0Mock, f0mean))+
+ggplot(dab, aes(robPrevf0Mock, f0mean))+
   geom_point()+
   facet_wrap(~condition)
 ```
 
 
 ```{r}
-summary(fbM <- lm(f0mean ~ prevf0Mock * condition, dab))
+summary(fbM <- lmer(f0mean ~ robPrevf0Mock * condition + (0+condition|speaker), dab))
 ```
 
 
