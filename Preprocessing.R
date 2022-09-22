@@ -254,8 +254,8 @@ f0b <- f0b %>% filter(abs(f0z) < 2.5)
 
 dat <- f0b
 
-# for each turn of the human, save `prevf0`, i.e. the f0 of the robot's previous turn
-# for the first IPU of the human, prevf0 is the f0 of the robot's last IPU in the previous turn. human's second IPU is robot's second-to-last IPU u.s.w
+# for each turn of the human, save `robPrevf0`, i.e. the f0 of the robot's previous turn
+# for the first IPU of the human, robPrevf0 is the f0 of the robot's last IPU in the previous turn. human's second IPU is robot's second-to-last IPU u.s.w
 
 # the following loop transforms the robot's IPUs into invIPUs, to match the IPUs of the human later
 
@@ -281,7 +281,7 @@ for(s in unique(dat$speaker[grepl("Robot", dat$speaker)])){
 
 dat <- full_join(dat, r, by=c("speaker", "turn", "IPU", "condition"))
 
-# now do a different dataset and create column `overallIPUs`, which are all the IPUs of the robot without dividing them by turn. this will serve for the `prevf0` of the baseline
+# now do a different dataset and create column `overallIPUs`, which are all the IPUs of the robot without dividing them by turn. this will serve for the `robPrevf0` of the baseline
 
 
 b <- data.frame(matrix(nrow=0, ncol=5))
@@ -303,8 +303,8 @@ for(s in unique(dat$speaker[grepl("Robot", dat$speaker)])){
 # dat <- datsave
 
 
-# the following was calculating the average f0 of each turn to then use it for `prevf0`
-# I'm not using this anymore for the `prevf0` of the conversations, but will keep it for the `prevf0` of the baseline
+# the following was calculating the average f0 of each turn to then use it for `robPrevf0`
+# I'm not using this anymore for the `robPrevf0` of the conversations, but will keep it for the `robPrevf0` of the baseline
 
 
 # calculate mean f0 per turn
@@ -326,14 +326,14 @@ dat$tgroup <- paste(dat$groupings, dat$turn, sep=".")
 # 
 # dat <- merge(dat, dt, by="tgroup")
 
-# to get the `prevf0` for the baseline, turn all the previous robot's IPUs into one long list of IPUs (not divided by turn),
+# to get the `robPrevf0` for the baseline, turn all the previous robot's IPUs into one long list of IPUs (not divided by turn),
 # then do invIPU like for the conversation
 
 
 
 dat <- dat %>% 
   mutate(interlocutor = ifelse(nchar(speaker)==3, paste0(speaker, "-Robot"), substr(speaker, 1, 3)),
-         prevf0 = NA,
+         robPrevf0 = NA,
          gapDur = NA)
 
 # add metadata
@@ -348,8 +348,8 @@ m <- read.csv(paste0(folder2, file)) %>%
 dam <- merge(dat, m, by="participant")
   
 
-# calculate prevf0, i.e. the average f0 of the interlocutor's previous turn
-# for the baseline, prevf0 is the average of all the first robot's turns (prevf0 in `baseline` only exists for the second baseline)
+# calculate robPrevf0, i.e. the average f0 of the interlocutor's previous turn
+# for the baseline, robPrevf0 is the average of all the first robot's turns (robPrevf0 in `baseline` only exists for the second baseline)
 # also calculate gapDur, i.e. the gap (in seconds) between the interlocutor's previous turn and speaker's current turn
 
 # t <- dam %>%
@@ -369,25 +369,25 @@ dac <- dam %>% filter(task == "Conversation") # Conversation dataset
 # dac <- dac[!grepl("TMF|BFI|GA|NG|Impairment|Dyslexia|Gender|Education|L1|Age", names(dac))]
 # dab <- dab[!grepl("TMF|BFI|GA|NG|Impairment|Dyslexia|Gender|Education|L1|Age", names(dab))]
 
-for(i in 1:nrow(dac)){ # getting `prevf0` for the Conversation dataset
+for(i in 1:nrow(dac)){ # getting `robPrevf0` for the Conversation dataset
   if(nchar(dac$speaker[i]) == 3){ # if the speaker is human
     if(dac$task[i] == "Conversation"){ # if it's during the conversation (vs baseline)
       previousf0 <- dac$f0mean[dac$speaker == dac$interlocutor[i] &
                                  dac$turn == dac$turn[i] &
                                  dac$condition == dac$condition[i] &
-                                 dac$invIPU == dac$IPU[i]]
+                                 dac$IPU == dac$IPU[i]] # tried also with dac$invIPU == dac$IPU[i]
       if(!purrr::is_empty(previousf0)){
-        dac$prevf0[i] <- previousf0
+        dac$robPrevf0[i] <- previousf0
       }
       prevEnd <- as.numeric(unique(dac$turnOffset[dac$speaker == dac$interlocutor[i] &
                                              dac$turn == dac$turn[i] &
                                              dac$condition == dac$condition[i]]))
-      dac$gapDur[i] <- as.numeric(dac$turnOffset[i]) - prevEnd
+      dac$gapDur[i] <- as.numeric(dac$turnOnset[i]) - prevEnd
     }
   }
 }
 
-dab$prevf0Mock <- NA
+dab$robPrevf0Mock <- NA
 
 for(i in 1:nrow(dab)){
   previousf0 <- b$f0mean[b$speaker == dab$interlocutor[i] &
@@ -395,22 +395,22 @@ for(i in 1:nrow(dab)){
                            b$overallIPU == dab$IPU[i]]
   if(!purrr::is_empty(previousf0)){
     if(!any(is.na(previousf0))){
-      dab$prevf0[i] <- previousf0
+      dab$robPrevf0[i] <- previousf0
     }
   }
   if(dab$condition[i] == substr(dab$Order[i], 1, 2)){
     previousf0Mock <- b$f0mean[b$speaker == dab$interlocutor[i] &
                                  b$condition == dab$condition[i] &
-                                 b$overallIPU == dab$IPU[i]]
+                                 b$IPU == dab$IPU[i]] # tried also with b$overallIPU == dab$IPU[i]
     if(!purrr::is_empty(previousf0Mock)){
       if(!any(is.na(previousf0Mock))){
-        dab$prevf0Mock[i] <- previousf0Mock
+        dab$robPrevf0Mock[i] <- previousf0Mock
       }
     }
   }
 }
 
-# we don't need to calculate `prevf0` for the robot, because the robot's speech wasn't influenced by the human anyway
+# we don't need to calculate `robPrevf0` for the robot, because the robot's speech wasn't influenced by the human anyway
 
 dL <- list(dab, dac)
 for(d in 1:length(dL)){
