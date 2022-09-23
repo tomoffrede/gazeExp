@@ -185,7 +185,7 @@ f0 <- f0 %>%
   mutate(participant = substr(file, 7, 9), # variable with name of speaker including for the robot subsets
          groupings = paste(speaker, condition, task, sep = "."))
 
-# for(i in unique(f0$participant)){
+{# for(i in unique(f0$participant)){
 #   dat0 <- f0 %>% filter(participant == i)
 #   par(mfrow=c(3, 2))
 #   for(g in unique(dat0$groupings)){
@@ -234,6 +234,7 @@ f0 <- f0 %>%
 
 # I'm not sure how to deal with it. why is there so much NA?
 # should we exclude files with too many NAs? what would be the cutoff point?
+  }
 
 # exclude f0 higher than 2.5 SD
 
@@ -283,7 +284,6 @@ dat <- full_join(dat, r, by=c("speaker", "turn", "IPU", "condition"))
 
 # now do a different dataset and create column `overallIPUs`, which are all the IPUs of the robot without dividing them by turn. this will serve for the `robPrevf0` of the baseline
 
-
 b <- data.frame(matrix(nrow=0, ncol=5))
 names(b) <- c("speaker", "IPU", "f0mean", "condition", "overallIPU")
 
@@ -294,7 +294,8 @@ for(s in unique(dat$speaker[grepl("Robot", dat$speaker)])){
                condition == c) %>%
         select(c(speaker, IPU, f0mean, condition)) %>% 
         mutate_at("IPU", as.numeric) %>%
-        mutate(overallIPU = n():1)
+        mutate(overallIPU = n():1,
+               continuousIPU = 1:n())
       b <- rbind(b, b0)
   }
 }
@@ -303,38 +304,32 @@ for(s in unique(dat$speaker[grepl("Robot", dat$speaker)])){
 # dat <- datsave
 
 
-# the following was calculating the average f0 of each turn to then use it for `robPrevf0`
-# I'm not using this anymore for the `robPrevf0` of the conversations, but will keep it for the `robPrevf0` of the baseline
-
-
-# calculate mean f0 per turn
-# (mean f0 of entire baseline for BL files)
-# save that as the f0 of the interlocutor's following turn
+# the following calculates the average f0 of each turn to then use it to calculate the difference between robot's and human's subsequent turns
  
 dat$tgroup <- paste(dat$groupings, dat$turn, sep=".")
 
-# dt <- data.frame(matrix(nrow=0, ncol=2))
-# names(dt) <- c("tgroup", "f0turn")
-# 
+dt <- data.frame(matrix(nrow=0, ncol=2))
+names(dt) <- c("tgroup", "f0turn")
+
 # t=unique(dat$tgroup[!grepl("baseline", dat$tgroup)])[[5]]
+
+for(t in unique(dat$tgroup)){
+  d <- dat %>%
+    filter(tgroup == t)
+  dt[nrow(dt)+1,] <- c(t, mean(d$f0mean, na.rm=TRUE))
+}
+
+dat <- merge(dat, dt, by="tgroup")
+
+# # to get the `robPrevf0` for the baseline, turn all the previous robot's IPUs into one long list of IPUs (not divided by turn),
+# # then do invIPU like for the conversation
 # 
-# for(t in unique(dat$tgroup)){
-#   d <- dat %>%
-#     filter(tgroup == t)
-#   dt[nrow(dt)+1,] <- c(t, mean(d$f0mean, na.rm=TRUE))
-# }
-# 
-# dat <- merge(dat, dt, by="tgroup")
-
-# to get the `robPrevf0` for the baseline, turn all the previous robot's IPUs into one long list of IPUs (not divided by turn),
-# then do invIPU like for the conversation
-
-
-
-dat <- dat %>% 
+dat <- dat %>%
   mutate(interlocutor = ifelse(nchar(speaker)==3, paste0(speaker, "-Robot"), substr(speaker, 1, 3)),
          robPrevf0 = NA,
-         gapDur = NA)
+         robPrevf0Mock = NA,
+         gapDur = NA,
+         f0Diff = NA)
 
 # add metadata
 
@@ -363,8 +358,12 @@ dam <- dam %>%
   mutate(prevCond = ifelse(condition == prevCond, NA, prevCond))
 
 dab <- dam %>% filter(task == "Baseline") %>% # Baseline dataset
-  select(-c("turn", "invIPU", "gapDur"))
-dac <- dam %>% filter(task == "Conversation") # Conversation dataset
+  select(-c("turn", "invIPU", "gapDur", "f0Diff"))
+dac <- dam %>% filter(task == "Conversation") %>%  # Conversation dataset
+  mutate_at("turn", as.numeric) %>% 
+  group_by(speaker) %>% 
+  mutate(turnNormal = (turn - min(turn)) / (max(turn) - min(turn))) %>% 
+  ungroup()
 
 # dac <- dac[!grepl("TMF|BFI|GA|NG|Impairment|Dyslexia|Gender|Education|L1|Age", names(dac))]
 # dab <- dab[!grepl("TMF|BFI|GA|NG|Impairment|Dyslexia|Gender|Education|L1|Age", names(dab))]
@@ -376,9 +375,20 @@ for(i in 1:nrow(dac)){ # getting `robPrevf0` for the Conversation dataset
                                  dac$turn == dac$turn[i] &
                                  dac$condition == dac$condition[i] &
                                  dac$IPU == dac$IPU[i]] # tried also with dac$invIPU == dac$IPU[i]
+      previousf0Mock <- dac$f0mean[dac$speaker == dac$interlocutor[i] &
+                                 dac$turn == dac$turn[i] &
+                                 dac$condition != dac$condition[i] & # here use the other condition
+                                 dac$IPU == dac$IPU[i]] # tried also with dac$invIPU == dac$IPU[i]
       if(!purrr::is_empty(previousf0)){
         dac$robPrevf0[i] <- previousf0
       }
+      if(!purrr::is_empty(previousf0Mock)){
+        dac$robPrevf0Mock[i] <- previousf0Mock
+      }
+      previousf0Turn <- as.numeric(unique(dac$f0turn[dac$speaker == dac$interlocutor[i] &
+                                     dac$turn == dac$turn[i] &
+                                     dac$condition == dac$condition[i]]))
+      dac$f0Diff[i] <- abs(as.numeric(dac$f0turn[i]) - previousf0Turn)
       prevEnd <- as.numeric(unique(dac$turnOffset[dac$speaker == dac$interlocutor[i] &
                                              dac$turn == dac$turn[i] &
                                              dac$condition == dac$condition[i]]))
@@ -387,21 +397,19 @@ for(i in 1:nrow(dac)){ # getting `robPrevf0` for the Conversation dataset
   }
 }
 
-dab$robPrevf0Mock <- NA
-
 for(i in 1:nrow(dab)){
   previousf0 <- b$f0mean[b$speaker == dab$interlocutor[i] &
                            b$condition == dab$prevCond[i] &
-                           b$overallIPU == dab$IPU[i]]
+                           b$continuousIPU == dab$IPU[i]] # also tried with b$overallIPU == dab$IPU[i]
   if(!purrr::is_empty(previousf0)){
     if(!any(is.na(previousf0))){
       dab$robPrevf0[i] <- previousf0
     }
   }
   if(dab$condition[i] == substr(dab$Order[i], 1, 2)){
-    previousf0Mock <- b$f0mean[b$speaker == dab$interlocutor[i] &
+    previousf0Mock <- as.numeric(b$f0mean[b$speaker == dab$interlocutor[i] &
                                  b$condition == dab$condition[i] &
-                                 b$IPU == dab$IPU[i]] # tried also with b$overallIPU == dab$IPU[i]
+                                 b$continuousIPU == dab$IPU[i]]) # tried also with b$overallIPU == dab$IPU[i]
     if(!purrr::is_empty(previousf0Mock)){
       if(!any(is.na(previousf0Mock))){
         dab$robPrevf0Mock[i] <- previousf0Mock
@@ -415,7 +423,7 @@ for(i in 1:nrow(dab)){
 dL <- list(dab, dac)
 for(d in 1:length(dL)){
   dL[[d]] <- dL[[d]] %>% 
-    select(-c("tgroup", "groupings"))
+    select(-"groupings")
 }
 dab <- dL[[1]]
 dac <- dL[[2]]

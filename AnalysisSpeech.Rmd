@@ -36,23 +36,25 @@ dab <- dab %>%
 ```
 
 ## Conditions:
-### GA: Gaze Aversion; the robot produced gaze aversion. Experimental condition.
-### NG: No Gaze aversion; the robot stared constantly at the human. Control condition.
+**GA: Gaze Aversion; the robot produced gaze aversion. Experimental condition.**
+**NG: No Gaze aversion; the robot stared constantly at the human. Control condition.**
 
 # Gap Duration
 
 ```{r}
 ggplot(dac, aes(condition, gapDur))+
   geom_boxplot()
+
+ggplot(dac, aes(turnNormal, gapDur))+
+  geom_point()+
+  facet_wrap(~condition)
 ```
 
 
-The model `gap duration ~ condition` is slightly better than the one that includes `order` (the order of conditions in each participant, i.e. if it was GA or NG first).
-
-But still, **no effect of condition on the duration of between-turn gaps**.
+There is **no effect of `condition`**  on the duration of between-turn gaps. There is, however, a `turn` effect: gaps get longer the further into the conversation, probably because the questions got harder and more intimate. There was no interaction effect.
 
 ```{r}
-summary(g1 <- lmer(gapDur ~ condition + (1 + condition | speaker), dac))
+summary(g1 <- lmer(gapDur ~ condition + turnNormal + (1 + condition | speaker), dac))
 ```
 
 # Turn Duration
@@ -60,38 +62,77 @@ summary(g1 <- lmer(gapDur ~ condition + (1 + condition | speaker), dac))
 ```{r}
 ggplot(dac %>% filter(!grepl("Robot", speaker)), aes(condition, turnDur))+
   geom_boxplot()
+
+ggplot(dac %>% filter(!grepl("Robot", speaker)), aes(turnNormal, turnDur))+
+  geom_point()+
+  facet_wrap(~condition)+
+  geom_smooth(method="lm")
 ```
 
-The model with `order` isn't better than the one without.
 
-Turns are slightly longer during GA condition, but |t| is only around 1.
+There is a `turn` effect: turns get longer the further into the interaction. There is also a `condition:turn` effect: in the `GA` condition, people tend to have longer turns across the interaction than the increase in turn length in the `NG` condition.
+
+This is in line with our hypothesis: we expected people in the `GA` condition to feel more comfortable and speak more.
 
 ```{r}
-summary(t1 <- lmer(turnDur ~ condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
+dac$condition <- relevel(dac$condition, ref="NG")
+summary(t1 <- lmer(turnDur ~ condition * turnNormal + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
 ```
 
 # f0 during conversation
+
+## Using the f0 from the IPUs of the robot's previous turn as predictors for the f0 of the IPUs of the human's current turn
 
 ```{r}
 ggplot(dac, aes(robPrevf0, f0mean))+
   geom_point()+
   facet_wrap(~condition)
+```
 
-ggplot(dac, aes(turn, f0mean))+
+There seems to be an interaction effect between `robot's previous f0` and `condition`:
+
+* f0 is higher during the `GA` condition overall (I'm not sure why)
+* **In `NG` condition:** higher robot's previous f0 = higher human's current f0
+* **In `GA` condition:** no effect of robot's previous f0 on human's current f0
+
+This means that people converged their f0 towards the robot more in the `NG` than in the `GA` condition.
+
+```{r}
+dac$condition <- relevel(dac$condition, ref="GA")
+summary(f1 <- lmer(f0mean ~ (robPrevf0 + condition)^2 + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
+```
+
+Now check how robust this is with `robPreviousf0Mock`:
+
+Here no effect shows up, so we can probably take the finding above as (somewhat?) robust.
+
+```{r}
+dac$condition <- relevel(dac$condition, ref="GA")
+summary(f1 <- lmer(f0mean ~ (robPrevf0Mock + condition)^2 + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
+```
+
+
+## Using the difference between the human's mean f0 in the current turn and the robot's mean f0 in the preceding turn
+
+```{r, include=FALSE}
+dat <- dac %>% 
+  filter(!duplicated(tgroup))
+```
+
+
+```{r}
+ggplot(dat, aes(condition, f0Diff))+
+  geom_boxplot()
+
+ggplot(dat, aes(turnNormal, f0Diff))+
   geom_point()+
   facet_wrap(~condition)
 ```
 
-
-Again, `order` doesn't improve the model.
-
-There doesn't seem to be an effect on f0 of interlocutor's previous turn's f0 or of its interaction with condition.
-The model only with `robPrevf0` and without condition also doesn't give a significant effect.
-
-The `turn` effect suggests that people speak with lower f0 the further into the conversation, but there are also considerably fewer data points the further into the conversation (see graph above), so that could be the reason for this apparent effect.
+Using this method we don't see any effect on f0.
 
 ```{r}
-summary(f1 <- lmer(f0mean ~ (robPrevf0 + condition + turn)^2 + (1 | speaker), dac %>% filter(!grepl("Robot", speaker))))
+summary(ft1 <- lmer(f0Diff ~ condition * turnNormal + (1 + condition | speaker), dat))
 ```
 
 # f0 during baseline
@@ -102,39 +143,22 @@ ggplot(dab, aes(robPrevf0, f0mean))+
   facet_wrap(~condition)
 ```
 
-The results from this regression model would suggest that people's f0 during their second baseline were predicted by the f0 of the robots they interacted with in the previous conversation. But the other regression model further below also suggests the same thing happens, except that that second model is based on f0 data from a robot that the participant hadn't interacted with yet. (There's a difference in the coefficients of `robPrevf0` depending on whether you use `GA` or `NG` as the reference condition.)
-
-Overall, I think this just means that the robots' and the humans' f0 are somehow close, but it doesn't mean the human converged to the robot.
+The model below would suggest that the f0 of the first robot the person talked to influenced the person's f0 when they were producing speech alone afterwards, but that there was no effect of condition.
 
 ```{r}
 dab$condition <- relevel(dab$condition, ref="GA")
-summary(fb1 <- lmer(f0mean ~ robPrevf0 * condition + (0 + condition | speaker), dab))
-```
-```{r}
-ggplot(dab, aes(robPrevf0Mock, f0mean))+
-  geom_point()+
-  facet_wrap(~condition)
+summary(fb2 <- lmer(f0mean ~ robPrevf0 * condition + (1 + condition | speaker), dab))
 ```
 
+However, if we remove `condition` from the model, the effect of `robot's previous f0` disappears.
 
 ```{r}
-summary(fbM <- lmer(f0mean ~ robPrevf0Mock * condition + (0+condition|speaker), dab))
+summary(fb1 <- lmer(f0mean ~ robPrevf0 + (1 | speaker), dab))
 ```
 
+Also, if we test the effect of some mock data (f0 of the robot the person hasn't interacted with yet), `robot's previous f0` also shows an effect. This happens both if we do or don't include `condition` in the model. So we can disregard the model on f0 of baseline.
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+```{r}
+summary(fbM <- lmer(f0mean ~ robPrevf0Mock * condition + (1 + condition | speaker), dab))
+```
 
