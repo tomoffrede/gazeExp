@@ -29,7 +29,14 @@ load(paste0(folder, fileBase))
 
 dac <- dac %>%
   mutate_at(c("turnDur", "turn", "f0mean", "robPrevf0", "gapDur"), as.numeric) %>%
-  mutate_at(c("speaker", "condition", "Order", "task"), as.factor)
+  mutate_at(c("speaker", "condition", "Order", "task"), as.factor) %>% 
+  group_by(speaker) %>% 
+  mutate(turnDurNormal = (turnDur - min(turnDur)) / (max(turnDur) - min(turnDur)),
+         f0z = (f0mean - min(f0mean)) / (max(f0mean) - min(f0mean)),
+         gapDurNormal = (gapDur - min(gapDur)) / (max(gapDur) - min(gapDur)),
+         f0DiffNormal = (f0Diff - min(f0Diff)) / (max(f0Diff) - min(f0Diff)),
+         robf0Normal = (robPrevf0 - min(robPrevf0, na.rm=TRUE)) / (max(robPrevf0, na.rm=TRUE) - min(robPrevf0, na.rm=TRUE))) %>% 
+  ungroup()
 
 dab <- dab %>%
   mutate_at(c("condition"), as.factor)
@@ -39,31 +46,35 @@ dab <- dab %>%
 **GA: Gaze Aversion; the robot produced gaze aversion. Experimental condition.**
 **NG: No Gaze aversion; the robot stared constantly at the human. Control condition.**
 
-# Gap Duration
+# Between-Turn Gap Duration
 
 ```{r}
-ggplot(dac, aes(condition, gapDur))+
+ggplot(dac, aes(condition, gapDurNormal))+
   geom_boxplot()
 
-ggplot(dac, aes(turnNormal, gapDur))+
+ggplot(dac, aes(turnNormal, gapDurNormal))+
   geom_point()+
-  facet_wrap(~condition)
+  facet_wrap(~condition)+
+  geom_smooth(method="lm")
 ```
 
 
-There is **no effect of `condition`**  on the duration of between-turn gaps. There is, however, a `turn` effect: gaps get longer the further into the conversation, probably because the questions got harder and more intimate. There was no interaction effect.
+* There is a `condition` effect: between-turn gaps are longer in the `NG` condition (in line with our  hypothesis)
+* There is a `turn` effect: gaps are longer the further into the conversation in both conditions (makes sense: questions get harder and more intimate)
+* There is a `condition:turn` effect: gaps get longer throughout the conversation in the `GA` condition than in the `NG` condition.
 
 ```{r}
-summary(g1 <- lmer(gapDur ~ condition + turnNormal + (1 + condition | speaker), dac))
+dac$condition <- relevel(dac$condition, ref="NG")
+summary(g1 <- lmer(gapDurNormal ~ condition * turnNormal + (1 + condition | speaker), dac))
 ```
 
 # Turn Duration
 
 ```{r}
-ggplot(dac %>% filter(!grepl("Robot", speaker)), aes(condition, turnDur))+
+ggplot(dac %>% filter(!grepl("Robot", speaker)), aes(condition, turnDurNormal))+
   geom_boxplot()
 
-ggplot(dac %>% filter(!grepl("Robot", speaker)), aes(turnNormal, turnDur))+
+ggplot(dac %>% filter(!grepl("Robot", speaker)), aes(turnNormal, turnDurNormal))+
   geom_point()+
   facet_wrap(~condition)+
   geom_smooth(method="lm")
@@ -76,7 +87,7 @@ This is in line with our hypothesis: we expected people in the `GA` condition to
 
 ```{r}
 dac$condition <- relevel(dac$condition, ref="NG")
-summary(t1 <- lmer(turnDur ~ condition * turnNormal + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
+summary(t1 <- lmer(turnDurNormal ~ condition * turnNormal + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
 ```
 
 # f0 during conversation
@@ -84,14 +95,14 @@ summary(t1 <- lmer(turnDur ~ condition * turnNormal + (1 + condition | speaker),
 ## Using the f0 from the IPUs of the robot's previous turn as predictors for the f0 of the IPUs of the human's current turn
 
 ```{r}
-ggplot(dac, aes(robPrevf0, f0mean))+
+ggplot(dac, aes(robf0Normal, f0z))+
   geom_point()+
-  facet_wrap(~condition)
+  facet_wrap(~condition)+
+  geom_smooth(method="lm")
 ```
 
 There seems to be an interaction effect between `robot's previous f0` and `condition`:
 
-* f0 is higher during the `GA` condition overall (I'm not sure why)
 * **In `NG` condition:** higher robot's previous f0 = higher human's current f0
 * **In `GA` condition:** no effect of robot's previous f0 on human's current f0
 
@@ -99,7 +110,7 @@ This means that people converged their f0 towards the robot more in the `NG` tha
 
 ```{r}
 dac$condition <- relevel(dac$condition, ref="GA")
-summary(f1 <- lmer(f0mean ~ (robPrevf0 + condition)^2 + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
+summary(f1 <- lmer(f0z ~ robf0Normal : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
 ```
 
 Now check how robust this is with `robPreviousf0Mock`:
@@ -109,6 +120,8 @@ Here no effect shows up, so we can probably take the finding above as (somewhat?
 ```{r}
 dac$condition <- relevel(dac$condition, ref="GA")
 summary(f1 <- lmer(f0mean ~ (robPrevf0Mock + condition)^2 + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
+dac$condition <- relevel(dac$condition, ref="GA")
+summary(f2 <- lmer(f0z ~ (robPrevf0Mock + condition)^2 + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
 ```
 
 
@@ -121,18 +134,25 @@ dat <- dac %>%
 
 
 ```{r}
+ggplot(dat, aes(condition, f0DiffNormal))+
+  geom_boxplot()
 ggplot(dat, aes(condition, f0Diff))+
   geom_boxplot()
 
 ggplot(dat, aes(turnNormal, f0Diff))+
   geom_point()+
-  facet_wrap(~condition)
+  facet_wrap(~condition)+
+  geom_smooth(method="lm")
+ggplot(dat, aes(turnNormal, f0DiffNormal))+
+  geom_point()+
+  facet_wrap(~condition)+
+  geom_smooth(method="lm")
 ```
 
 Using this method we don't see any effect on f0.
 
 ```{r}
-summary(ft1 <- lmer(f0Diff ~ condition * turnNormal + (1 + condition | speaker), dat))
+summary(ft1 <- lmer(f0DiffNormal ~ condition * turnNormal + (1 + condition | speaker), dat))
 ```
 
 # f0 during baseline
@@ -162,3 +182,4 @@ Also, if we test the effect of some mock data (f0 of the robot the person hasn't
 summary(fbM <- lmer(f0mean ~ robPrevf0Mock * condition + (1 + condition | speaker), dab))
 ```
 
+If we use f0z instead of f0, the results look even less robust. We can assume there was no lasting convergence effect.

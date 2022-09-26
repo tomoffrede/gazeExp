@@ -5,7 +5,7 @@ library(tidyverse)
 library(lme4)
 `%!in%` <- Negate(`%in%`)
 
-folder <- "C:/Users/tomof/Documents/1HU/ExperimentEyes/Data/"
+folder <- "C:/Users/offredet/Documents/1HU/ExperimentEyes/Data/"
 files <- list.files(folder)
 
 h <- read.csv(paste0(folder, files[grepl("metadata", files)])) %>% 
