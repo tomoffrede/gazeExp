@@ -3,6 +3,7 @@
 
 library(tidyverse)
 library(lme4)
+library(ggdist)
 `%!in%` <- Negate(`%in%`)
 
 folder <- "C:/Users/offredet/Documents/1HU/ExperimentEyes/Data/"
@@ -26,7 +27,9 @@ h1 <- h %>%
   gather(condition, rating, c(HL.NG, HL.GA), factor_key = TRUE)
 
 ggplot(h1, aes(condition, rating))+
-  geom_boxplot()
+  stat_halfeye(adjust = .5,  width = .5, justification = -.2, .width = c(.5, .95))+
+  geom_boxplot(width=.13)+
+  coord_cartesian(xlim = c(1.2, NA))
 
 summary(lmer(rating ~ condition + (1|Participant), h1))
 # if anything, people find the no-gaze-aversion more humanlike! opposite of our hypothesis

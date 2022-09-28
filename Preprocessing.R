@@ -6,6 +6,7 @@ library(lme4)
 `%!in%` <- Negate(`%in%`)
 
 folder <- "C:/Users/offredet/Documents/1HU/ExperimentEyes/Data/All/"
+folder2 <- "C:/Users/offredet/Documents/1HU/ExperimentEyes/Data/"
 
 # (referring to a previously written regression with turnDuration ~ Condition:)
 # doing this regression with only the humans' data shows no significant difference in turn durations (t = -1.627)
@@ -427,6 +428,35 @@ for(d in 1:length(dL)){
 }
 dab <- dL[[1]]
 dac <- dL[[2]]
+
+# add intimacy rating for each question
+
+# first we have to figure out which participant saw which question in each condition
+
+q <- read.csv(paste0(folder2, "questions.csv"), header=TRUE, dec=".", sep=";")
+
+d <- data.frame(matrix(nrow=0, ncol=3))
+names(d) <- c("tgroup","turnDur", "QTurn")
+
+for(s in unique(dac$speaker[!grepl("Robot", dac$speaker)])){
+  for(c in unique(dac$condition[dac$speaker==s])){
+    QTurnCount <- 0
+    for(t in unique(dac$tgroup[dac$speaker==s & dac$condition==c])){
+      if(unique(dac$turnDur[dac$tgroup == t] > 1)){
+        QTurnCount <- QTurnCount + 1
+        d[nrow(d)+1,] <- c(t, unique(dac$turnDur[dac$tgroup == t]), QTurnCount)  
+      }
+    }
+  }
+}
+
+dac <- dac %>% 
+  group_by(tgroup) %>% 
+  mutate(QTurn = ifelse(turnDur > 1,)) %>% 
+  ungroup()
+
+dac$QIntimacy <- NA
+
 
 # still have to do something with the questionnaire data
 

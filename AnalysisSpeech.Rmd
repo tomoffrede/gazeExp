@@ -55,7 +55,7 @@ ggplot(dac, aes(condition, gapDurNormal))+
 ggplot(dac, aes(turnNormal, gapDurNormal))+
   geom_point()+
   facet_wrap(~condition)+
-  geom_smooth(method="lm")
+  geom_smooth(method="loess")
 ```
 
 
@@ -77,7 +77,7 @@ ggplot(dac %>% filter(!grepl("Robot", speaker)), aes(condition, turnDurNormal))+
 ggplot(dac %>% filter(!grepl("Robot", speaker)), aes(turnNormal, turnDurNormal))+
   geom_point()+
   facet_wrap(~condition)+
-  geom_smooth(method="lm")
+  geom_smooth(method="loess")
 ```
 
 
