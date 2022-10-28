@@ -14,7 +14,7 @@ folder2 <- "C:/Users/offredet/Documents/1HU/ExperimentEyes/Data/"
 # I'd expect them to vary in duration randomly, and either maintain the same |t| value or reduce it.
 # But if it increased, it could be that the experimenter was behaving differently in each condition.
 # voices: one was slower and one faster. we tried to counterbalance them across orders but it wasn't a perfect balance (something like 20-30)
-# this could be the source for the effect
+# this could be the source of the effect
 
 ## (part of it adapted from AudioData.R)
 
@@ -76,7 +76,7 @@ for(i in 1:nrow(files)){
     turnCountHuman <- 0
     turnCountRobot <- 0
     for(n in 1:tg.getNumberOfIntervals(tg, "participant")){
-      if(tg.getLabel(tg, "participant", n) == "s"){
+      if(tg.getLabel(tg, "participant", n) == "sQ"){
         ipuCount <- 0
         turnCountHuman <- turnCountHuman + 1
         turnOnset <- as.numeric(tg.getIntervalStartTime(tg, "participant", n))
@@ -116,7 +116,7 @@ for(i in 1:nrow(files)){
       }
     }
     for(n in 1:tg.getNumberOfIntervals(tg, "robot")){
-      if(tg.getLabel(tg, "robot", n) == "s"){
+      if(tg.getLabel(tg, "robot", n) == "sQ"){
         ipuCount <- 0
         turnCountRobot <- turnCountRobot + 1
         turnOnset <- as.numeric(tg.getIntervalStartTime(tg, "robot", n))
@@ -433,22 +433,14 @@ dac <- dL[[2]]
 
 # first we have to figure out which participant saw which question in each condition
 
+# dac <- dac[!grepl("TMF|BFI|GA|NG|Impairment|Dyslexia|Gender|Education|L1|Age", names(dac))]
+
 q <- read.csv(paste0(folder2, "questions.csv"), header=TRUE, dec=".", sep=";")
 
 d <- data.frame(matrix(nrow=0, ncol=3))
 names(d) <- c("tgroup","turnDur", "QTurn")
 
-for(s in unique(dac$speaker[!grepl("Robot", dac$speaker)])){
-  for(c in unique(dac$condition[dac$speaker==s])){
-    QTurnCount <- 0
-    for(t in unique(dac$tgroup[dac$speaker==s & dac$condition==c])){
-      if(unique(dac$turnDur[dac$tgroup == t] > 1)){
-        QTurnCount <- QTurnCount + 1
-        d[nrow(d)+1,] <- c(t, unique(dac$turnDur[dac$tgroup == t]), QTurnCount)  
-      }
-    }
-  }
-}
+### here: match participant to question text + rating based on `q`
 
 dac <- dac %>% 
   group_by(tgroup) %>% 
