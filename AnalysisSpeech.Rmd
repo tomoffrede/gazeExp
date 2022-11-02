@@ -21,21 +21,23 @@ library(lme4)
 
 folder <- "C:/Users/offredet/Documents/1HU/ExperimentEyes/Data/All/"
 files <- list.files(folder, "RData")
-fileConv <- files[grepl("Conversation", files)]
+fileConv <- files[grepl("Conversation", files) & !grepl("Including", files)]
 fileBase <- files[grepl("Baseline", files)]
 
-load(paste0(folder, fileConv))
 load(paste0(folder, fileBase))
+load(paste0(folder, fileConv))
+
+dac <- dac[!grepl("TMF|BFI|Impairment|Dyslexia|Gender|Education|Age", names(dac))]
 
 dac <- dac %>%
-  mutate_at(c("turnDur", "turn", "f0mean", "robPrevf0", "gapDur"), as.numeric) %>%
+  mutate_at(c("turnDur", "turn", "f0mean", "robPrevf0", "gapDur", "intimMean", "intimSD", "intimMed"), as.numeric) %>%
   mutate_at(c("speaker", "condition", "Order", "task"), as.factor) %>% 
-  group_by(speaker) %>% 
-  mutate(turnDurNormal = (turnDur - min(turnDur)) / (max(turnDur) - min(turnDur)),
-         f0z = (f0mean - min(f0mean)) / (max(f0mean) - min(f0mean)),
-         gapDurNormal = (gapDur - min(gapDur)) / (max(gapDur) - min(gapDur)),
-         f0DiffNormal = (f0Diff - min(f0Diff)) / (max(f0Diff) - min(f0Diff)),
-         robf0Normal = (robPrevf0 - min(robPrevf0, na.rm=TRUE)) / (max(robPrevf0, na.rm=TRUE) - min(robPrevf0, na.rm=TRUE))) %>% 
+  group_by(speaker) %>%
+  mutate(turnDurNormal = (turnDur - min(turnDur, na.rm = TRUE)) / (max(turnDur, na.rm = TRUE) - min(turnDur, na.rm = TRUE)),
+         f0z = (f0mean - min(f0mean, na.rm = TRUE)) / (max(f0mean, na.rm = TRUE) - min(f0mean, na.rm = TRUE)),
+         gapDurNormal = (gapDur - min(gapDur, na.rm = TRUE)) / (max(gapDur, na.rm = TRUE) - min(gapDur, na.rm = TRUE)), 
+         f0DiffNormal = (f0Diff - min(f0Diff, na.rm = TRUE)) / (max(f0Diff, na.rm = TRUE) - min(f0Diff, na.rm = TRUE)),
+         robf0Normal = (robPrevf0 - min(robPrevf0, na.rm=TRUE)) / (max(robPrevf0, na.rm=TRUE) - min(robPrevf0, na.rm=TRUE))) %>%
   ungroup()
 
 dab <- dab %>%
@@ -56,16 +58,22 @@ ggplot(dac, aes(turnNormal, gapDurNormal))+
   geom_point()+
   facet_wrap(~condition)+
   geom_smooth(method="loess")
+
+ggplot(dac, aes(turnNormal, gapDurNormal))+
+  geom_point()+
+  facet_wrap(~condition)+
+  geom_smooth(method="loess")
 ```
 
 
 * There is a `condition` effect: between-turn gaps are longer in the `NG` condition (in line with our  hypothesis)
 * There is a `turn` effect: gaps are longer the further into the conversation in both conditions (makes sense: questions get harder and more intimate)
 * There is a `condition:turn` effect: gaps get longer throughout the conversation in the `GA` condition than in the `NG` condition.
+* There is an `intimacy` effect: longer gaps before more intimate questions (but these questions were also harder to answer! So it's probably mostly because of that)
 
 ```{r}
 dac$condition <- relevel(dac$condition, ref="NG")
-summary(g1 <- lmer(gapDurNormal ~ condition * turnNormal + (1 + condition | speaker), dac))
+summary(g1 <- lmer(gapDurNormal ~ condition * turnNormal + intimMean + (1 + condition | speaker), dac))
 ```
 
 # Turn Duration
@@ -81,13 +89,19 @@ ggplot(dac %>% filter(!grepl("Robot", speaker)), aes(turnNormal, turnDurNormal))
 ```
 
 
-There is a `turn` effect: turns get longer the further into the interaction. There is also a `condition:turn` effect: in the `GA` condition, people tend to have longer turns across the interaction than the increase in turn length in the `NG` condition.
+The order of the `turn` has a .95 correlation with `intimacy` ratings, since the questions always followed the same order. So we can't say if turn duration got higher with the progression of the conversation or because the questions got more intimate, or simply because the questions got more elaborate (so people had more things to talk about).
 
-This is in line with our hypothesis: we expected people in the `GA` condition to feel more comfortable and speak more.
+So if we make a model with `turn` or `intimacy`, both give the same results -- the one with `turn` showing slightly larger effect sizes.
+
+
 
 ```{r}
+cor.test(dac$turnNormal, dac$intimMean)
+
 dac$condition <- relevel(dac$condition, ref="NG")
-summary(t1 <- lmer(turnDurNormal ~ condition * turnNormal + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
+summary(t1 <- lmer(turnDur ~ condition * turnNormal + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
+
+summary(t1 <- lmer(turnDur ~ condition * intimMean + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
 ```
 
 # f0 during conversation
@@ -95,33 +109,55 @@ summary(t1 <- lmer(turnDurNormal ~ condition * turnNormal + (1 + condition | spe
 ## Using the f0 from the IPUs of the robot's previous turn as predictors for the f0 of the IPUs of the human's current turn
 
 ```{r}
-ggplot(dac, aes(robf0Normal, f0z))+
+ggplot(dac %>% filter(!grepl("Robot", speaker)), aes(robf0Normal, f0z))+
+  geom_point()+
+  facet_wrap(~condition)+
+  geom_smooth(method="lm")
+
+ggplot(dac %>% filter(!grepl("Robot", speaker)), aes(intimMean, f0mean))+
   geom_point()+
   facet_wrap(~condition)+
   geom_smooth(method="lm")
 ```
 
-There seems to be an interaction effect between `robot's previous f0` and `condition`:
 
-* **In `NG` condition:** higher robot's previous f0 = higher human's current f0
-* **In `GA` condition:** no effect of robot's previous f0 on human's current f0
+There seem to be effects of `intimacy` and `robot's f0` in interaction with `condition`. However, I am not sure what model to use.
 
-This means that people converged their f0 towards the robot more in the `NG` than in the `GA` condition.
+If we make a model only with (`interaction of intimacy and condition` + `interaction of robot's f0 and condition`), the only |t| > 2 is:
+* `no-GA condition : robot's f0`: the robot's f0 predicts the human's f0 only in the no-gaze aversion condition). See:
 
 ```{r}
-dac$condition <- relevel(dac$condition, ref="GA")
-summary(f1 <- lmer(f0z ~ robf0Normal : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
+dac$condition <- relevel(dac$condition, ref="NG")
+
+summary(f1 <- lmer(f0z ~ intimMean : condition + robf0Normal : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
+```
+
+
+If we make a model including all the main effects plus two-way interactions between the three variables, we get:
+* mean effect of `intimacy`: lower f0 with higher intimacy
+* `intimacy : robot's f0`: positive effect of this interaction (so for a given value of intimacy, human's f0 gets higher for higher robot's f0?)
+
+```{r}
+summary(f1 <- lmer(f0z ~ (intimMean + condition + robf0Normal)^2 + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
+```
+
+If we make a model with the interaction of `robot's f0` and `condition` and a main effect of `intimacy`, we get:
+* main effect of `intimacy`: higher intimacy = lower f0
+* `robot's f0 : condition`: robot'S f0 predicts human's f0 only in the staring condition (i.e., the finding we had already reported in the P&P paper)
+
+This seems the easiest model to explain, and with nicer results to talk about. But is this p-hacking?
+
+```{r}
+summary(f1 <- lmer(f0z ~ intimMean + robf0Normal : condition + IntellectOpenness : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
 ```
 
 Now check how robust this is with `robPreviousf0Mock`:
 
-Here no effect shows up, so we can probably take the finding above as (somewhat?) robust.
+Here no effect shows up for `robot's MOCK f0`, so we can probably take the finding above as (somewhat?) robust.
 
 ```{r}
 dac$condition <- relevel(dac$condition, ref="GA")
-summary(f1 <- lmer(f0mean ~ (robPrevf0Mock + condition)^2 + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
-dac$condition <- relevel(dac$condition, ref="GA")
-summary(f2 <- lmer(f0z ~ (robPrevf0Mock + condition)^2 + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
+summary(f2 <- lmer(f0z ~ intimMean + robPrevf0Mock : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
 ```
 
 
@@ -160,26 +196,23 @@ summary(ft1 <- lmer(f0DiffNormal ~ condition * turnNormal + (1 + condition | spe
 ```{r}
 ggplot(dab, aes(robPrevf0, f0mean))+
   geom_point()+
-  facet_wrap(~condition)
+  facet_wrap(~condition)+
+  geom_smooth(method="lm")
 ```
 
-The model below would suggest that the f0 of the first robot the person talked to influenced the person's f0 when they were producing speech alone afterwards, but that there was no effect of condition.
+The model below would suggest that only for the NG condition, the robot's f0 in the PREVIOUS interaction *negatively* predicted the human's f0 in the following baseline recording.
 
 ```{r}
 dab$condition <- relevel(dab$condition, ref="GA")
-summary(fb2 <- lmer(f0mean ~ robPrevf0 * condition + (1 + condition | speaker), dab))
+summary(fb2 <- lmer(f0mean ~ robPrevf0 * condition + (1 | speaker), dab))
 ```
 
-However, if we remove `condition` from the model, the effect of `robot's previous f0` disappears.
+If we test the effect of some **mock data** (f0 of the robot the person hasn't interacted with yet), `robot's previous f0` doesn't show an effect.
 
 ```{r}
-summary(fb1 <- lmer(f0mean ~ robPrevf0 + (1 | speaker), dab))
-```
-
-Also, if we test the effect of some mock data (f0 of the robot the person hasn't interacted with yet), `robot's previous f0` also shows an effect. This happens both if we do or don't include `condition` in the model. So we can disregard the model on f0 of baseline.
-
-```{r}
-summary(fbM <- lmer(f0mean ~ robPrevf0Mock * condition + (1 + condition | speaker), dab))
+summary(fbM <- lmer(f0mean ~ robPrevf0Mock * condition + (1 | speaker), dab))
 ```
 
 If we use f0z instead of f0, the results look even less robust. We can assume there was no lasting convergence effect.
+
+
