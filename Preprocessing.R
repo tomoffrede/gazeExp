@@ -435,22 +435,123 @@ dac <- dL[[2]]
 
 # dac <- dac[!grepl("TMF|BFI|GA|NG|Impairment|Dyslexia|Gender|Education|L1|Age", names(dac))]
 
-q <- read.csv(paste0(folder2, "questions.csv"), header=TRUE, dec=".", sep=";")
+q <- read.csv(paste0(folder2, "questions.csv"), header=TRUE, dec=".", sep=";") %>% 
+  select(-Q) %>% 
+  group_by(scenario) %>% 
+  mutate(turn = 1:n()) %>% 
+  ungroup()
+    
 
-d <- data.frame(matrix(nrow=0, ncol=3))
-names(d) <- c("tgroup","turnDur", "QTurn")
-
-### here: match participant to question text + rating based on `q`
+# match participant to question text + rating based on `q`
 
 dac <- dac %>% 
-  group_by(tgroup) %>% 
-  mutate(QTurn = ifelse(turnDur > 1,)) %>% 
-  ungroup()
+  mutate(scenario = ifelse(condition == substr(Order, 1, 2), 1, 2))
 
-dac$QIntimacy <- NA
+dac <- full_join(dac, q, by=c("scenario", "turn")) %>% 
+  rename("intimMean"="mean", "intimMed"="median", "intimSD"="SD")
 
+# rename questionnaire columns so they make sense
+# also get rid of all the TMF columns: transform them into on TMF.F and one TMF.M
 
-# still have to do something with the questionnaire data
+questionnaire <- data.frame(questionNumber = c(1:12),
+                            question = c("conversationFlow",
+                                          "floorYield",
+                                          "floorHold",
+                                          "robTiming",
+                                          "faceHumanlike",
+                                          "voiceHumanlike",
+                                          "behaviorHumanlike",
+                                          "generalHumanlike",
+                                          "enjoyTalkingToRob",
+                                          "positiveAboutRob",
+                                          "positiveAboutConv",
+                                          "comfortTalkingToRob"),
+                            dimension = c(rep("Dim:convFlow", 4), rep("Dim:humanlikeness", 4), rep("Dim:overallImpression", 4)))
+
+dacsave <- dac
+dac <- dacsave
+
+daq <- dac %>%
+  filter(!grepl("Robot", speaker)) %>% 
+  select(speaker, GA.1:NG.12) %>% 
+  distinct() %>%
+  gather(key=condition, value=rating, -speaker) %>% 
+  mutate(questionNumber = substr(condition, 4, nchar(condition)),
+         condition = substr(condition, 1, 2))
+
+daq <- merge(daq, questionnaire, by="questionNumber") %>% 
+  group_by(speaker, dimension, condition) %>% 
+  mutate(dimensionRating = mean(rating, na.rm=TRUE)) %>%
+  ungroup() %>% 
+  select(-questionNumber) %>% 
+  spread(key=dimension, value=dimensionRating) %>% 
+  spread(key=question, value = rating)
+
+# this produces three rows per speaker/condition, each with a bunch of NAs and a couple of values.
+# to put these rows together into one row per speaker/condition, do the following
+# (taken from https://stackoverflow.com/questions/45515218/combine-rows-in-data-frame-containing-na-to-make-complete-row)
+
+coalesce_by_column <- function(daq) {
+  return(dplyr::coalesce(!!! as.list(daq)))
+}
+
+daq <- daq %>%
+  group_by(speaker, condition) %>%
+  summarise_all(coalesce_by_column)
+
+dac <- dac %>%
+  select(-c(GA.1:NG.12))
+
+# join dac with the questionnaire data
+# and then also reduce the dataset by calculating the TMF scores
+
+dac <- full_join(dac, daq, by=c("speaker", "condition")) %>% 
+  group_by(speaker) %>% 
+  mutate(TMF.F = (TMF.F1+TMF.F2+TMF.F3+TMF.F4+TMF.F5+TMF.F6)/6,
+         TMF.M = (TMF.M1+TMF.M2+TMF.M3+TMF.M4+TMF.M5+TMF.M6)/6) %>% 
+  ungroup() %>% 
+  select(-c(TMF.M1:TMF.F6, scenario))
+
+# calculate the BFI scores (average of each dimension)
+
+bfi <- read.csv(paste0(folder2, "adjectivesBFI.csv"), sep = ";")
+
+db <- dac %>% 
+  filter(!grepl("Robot", speaker)) %>% 
+  select(speaker, BFI1:BFI40) %>% 
+  distinct() %>%
+  gather(key=adjNumber, value=rating, -speaker) %>% 
+  mutate(adjNumber = substr(adjNumber, 4, nchar(adjNumber)))
+
+db <- merge(db, bfi, by="adjNumber")
+
+for(r in 1:nrow(db)){
+  if(db$inverted[r] == "True"){
+    db$rating[r] <- 6 - db$rating[r] # 6 because the highest possible rating was 5
+  }
+}
+
+db <- db %>% 
+  group_by(speaker, dimensionBFI) %>% 
+  mutate(dimensionBFIRating = mean(rating, na.rm=TRUE)) %>% 
+  ungroup() %>% 
+  spread(key=dimensionBFI, value=dimensionBFIRating) %>% 
+  select(-c("adjNumber", "rating", "adjectiveBFI", "inverted"))
+
+# again, the rows with NAs...
+
+coalesce_by_column <- function(db) {
+  return(dplyr::coalesce(!!! as.list(db)))
+}
+
+db <- db %>%
+  group_by(speaker) %>%
+  summarise_all(coalesce_by_column)
+
+dac <- merge(dac, db, by="speaker") %>% 
+  select(-c(BFI1:BFI40))
+
+# save files
 
 save(dac, file = paste0(folder, "dataConversation.RData"))
 save(dab, file = paste0(folder, "dataBaseline.RData"))
