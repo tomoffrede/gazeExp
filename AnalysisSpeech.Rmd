@@ -148,7 +148,46 @@ If we make a model with the interaction of `robot's f0` and `condition` and a ma
 This seems the easiest model to explain, and with nicer results to talk about. But is this p-hacking?
 
 ```{r}
-summary(f1 <- lmer(f0z ~ intimMean + robf0Normal : condition + IntellectOpenness : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
+summary(f1 <- lmer(f0z ~ intimMean + robf0Normal : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
+```
+```{r}
+ggplot(dac, aes(Conscientiousness, f0z))+
+  geom_point()+
+  facet_wrap(~condition)+
+  geom_smooth(method = "lm")+
+  ggtitle("Conscientiousness")
+
+heatmap(dac$Conscientiousness)
+
+ggplot(dac, aes(IntellectOpenness, robf0Normal))+
+  geom_point()+
+  facet_wrap(~condition)+
+  geom_smooth(method = "lm")+
+  ggtitle("IntellectOpenness")
+
+ggplot(dac, aes(Extraversion, robf0Normal))+
+  geom_point()+
+  facet_wrap(~condition)+
+  geom_smooth(method = "lm")+
+  ggtitle("Extraversion")
+
+ggplot(dac, aes(EmotionalStability, robf0Normal))+
+  geom_point()+
+  facet_wrap(~condition)+
+  geom_smooth(method = "lm")+
+  ggtitle("EmotionalStability")
+
+ggplot(dac, aes(Agreeableness, robf0Normal))+
+  geom_point()+
+  facet_wrap(~condition)+
+  geom_smooth(method = "lm")+
+  ggtitle("Agreeableness")
+```
+
+
+```{r}
+dac$condition <- relevel(dac$condition, ref="GA")
+summary(f1 <- lmer(f0z ~ IntellectOpenness : robf0Normal + robf0Normal : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
 ```
 
 Now check how robust this is with `robPreviousf0Mock`:
