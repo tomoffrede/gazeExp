@@ -142,7 +142,7 @@ summary(f1 <- lmer(f0z ~ (intimMean + condition + robf0Normal)^2 + (1 + conditio
 ```
 
 If we make a model with the interaction of `robot's f0` and `condition` and a main effect of `intimacy`, we get:
-* main effect of `intimacy`: higher intimacy = lower f0
+* main effect of `intimacy`: higher intimacy = lower f0 (i.e., intimacy does not affect *convergence*, only f0 itself)
 * `robot's f0 : condition`: robot'S f0 predicts human's f0 only in the staring condition (i.e., the finding we had already reported in the P&P paper)
 
 This seems the easiest model to explain, and with nicer results to talk about. But is this p-hacking?
@@ -150,44 +150,139 @@ This seems the easiest model to explain, and with nicer results to talk about. B
 ```{r}
 summary(f1 <- lmer(f0z ~ intimMean + robf0Normal : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
 ```
+
+
+### BFI
+
+For each BFI dimension, I compared a model `f0 ~ robot's f0 : condition : [BFI dimension]` to one without the dimension. All the models with the BFI dimension show a t > 2 for the effect of `robot's f0` and `BFI` in the NG condition (but not GA condition). But since I wouldn't expect that all BFI dimensions would predict convergence, I am comparing the AICs of the models with and without BFI. When the AIC of the model *with* BFI is lower (even with the added varialbe), then we can maybe assume that the BFI effect is meaningful.
+
+**Conclusion** about BFI dimesions:
+
+The only BFI dimension that predicted convergence was `Extraversion`. See details for each BFI dimension below.
+
+`Intellect/Openness`: AIC of model with BFI dimension is not lower.
+
 ```{r}
-ggplot(dac, aes(Conscientiousness, f0z))+
-  geom_point()+
-  facet_wrap(~condition)+
-  geom_smooth(method = "lm")+
-  ggtitle("Conscientiousness")
+summary(intel1 <- lmer(f0z ~ robf0Normal : IntellectOpenness : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
 
-heatmap(dac$Conscientiousness)
-
-ggplot(dac, aes(IntellectOpenness, robf0Normal))+
-  geom_point()+
-  facet_wrap(~condition)+
-  geom_smooth(method = "lm")+
-  ggtitle("IntellectOpenness")
-
-ggplot(dac, aes(Extraversion, robf0Normal))+
-  geom_point()+
-  facet_wrap(~condition)+
-  geom_smooth(method = "lm")+
-  ggtitle("Extraversion")
-
-ggplot(dac, aes(EmotionalStability, robf0Normal))+
-  geom_point()+
-  facet_wrap(~condition)+
-  geom_smooth(method = "lm")+
-  ggtitle("EmotionalStability")
-
-ggplot(dac, aes(Agreeableness, robf0Normal))+
-  geom_point()+
-  facet_wrap(~condition)+
-  geom_smooth(method = "lm")+
-  ggtitle("Agreeableness")
+summary(no1 <- lmer(f0z ~ robf0Normal : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
+anova(intel1, no1)
 ```
 
+`Agreeableness`: AIC is the same in both models
 
 ```{r}
-dac$condition <- relevel(dac$condition, ref="GA")
-summary(f1 <- lmer(f0z ~ IntellectOpenness : robf0Normal + robf0Normal : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
+d <- dac %>%
+  filter(!grepl("Robot", speaker)) %>% 
+  select(f0z, robf0Normal, Agreeableness, condition, speaker) %>% 
+  na.omit()
+
+summary(agree1 <- lmer(f0z ~ robf0Normal : Agreeableness : condition + (1 + condition | speaker), d))
+
+summary(no1 <- lmer(f0z ~ robf0Normal : condition + (1 + condition | speaker), d))
+anova(agree1, no1)
+```
+`Conscientiousness`: same AIC
+
+```{r}
+d <- dac %>%
+  filter(!grepl("Robot", speaker)) %>% 
+  select(f0z, robf0Normal, Conscientiousness, condition, speaker) %>% 
+  na.omit()
+
+summary(con1 <- lmer(f0z ~ robf0Normal : Conscientiousness : condition + (1 + condition | speaker), d))
+
+summary(no1 <- lmer(f0z ~ robf0Normal : condition + (1 + condition | speaker), d))
+anova(con1, no1)
+```
+
+`EmotionalStability`: same AIC
+
+```{r}
+d <- dac %>%
+  filter(!grepl("Robot", speaker)) %>% 
+  select(f0z, robf0Normal, EmotionalStability, condition, speaker) %>% 
+  na.omit()
+
+summary(em1 <- lmer(f0z ~ robf0Normal : EmotionalStability : condition + (1 + condition | speaker), d))
+
+summary(no1 <- lmer(f0z ~ robf0Normal : condition + (1 + condition | speaker), d))
+anova(em1, no1)
+```
+`Extraversion`: AIC is lower in model with Extraversion!
+
+```{r}
+summary(ex1 <- lmer(f0z ~ robf0Normal : Extraversion : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
+
+summary(no1 <- lmer(f0z ~ robf0Normal : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
+anova(ex1, no1)
+```
+(Find a way to visualize the relationship of f0z ~ robf0Normal * [BFI] * condition. e.g. heat map with facet_wrap?)
+```{r}
+# ggplot(dac, aes(IntellectOpenness, robf0Normal))+
+#   geom_point()+
+#   facet_wrap(~condition)+
+#   geom_smooth(method = "lm")+
+#   ggtitle("IntellectOpenness")
+# 
+# ggplot(dac, aes(Extraversion, robf0Normal))+
+#   geom_point()+
+#   facet_wrap(~condition)+
+#   geom_smooth(method = "lm")+
+#   ggtitle("Extraversion")
+# 
+# ggplot(dac, aes(EmotionalStability, robf0Normal))+
+#   geom_point()+
+#   facet_wrap(~condition)+
+#   geom_smooth(method = "lm")+
+#   ggtitle("EmotionalStability")
+# 
+# ggplot(dac, aes(Agreeableness, robf0Normal))+
+#   geom_point()+
+#   facet_wrap(~condition)+
+#   geom_smooth(method = "lm")+
+#   ggtitle("Agreeableness")
+# 
+# d <- as.matrix(dac %>% select(Conscientiousness, f0z, robf0Normal))
+# wireframe(f0z ~ Conscientiousness * robf0Normal, dac %>% filter)
+# 
+# ggplot(dac, aes(robf0Normal, f0z))+
+#   geom_contour()+
+#   # facet_wrap(~condition)+
+#   # geom_smooth(method = "lm")+
+#   ggtitle("Conscientiousness")
+```
+
+### Questionnaire dimensions
+
+same procedure as for the BFI dimensions.
+
+Conclusion of questionnaire dimensions. No dimensions predict convergence. See details for each dimension below.
+
+`DimConvFlow`: AIC is the same
+
+```{r}
+summary(cf1 <- lmer(f0z ~ robf0Normal : DimConvFlow : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
+
+summary(no1 <- lmer(f0z ~ robf0Normal : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
+anova(cf1, no1)
+```
+`DimHumanlikeness`: AIC is the same
+
+```{r}
+summary(hl1 <- lmer(f0z ~ robf0Normal : DimHumanlikeness : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
+
+summary(no1 <- lmer(f0z ~ robf0Normal : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
+anova(hl1, no1)
+```
+
+`DimOverallImpression`: AIC increased a bit with the dimension.
+
+```{r}
+summary(oi1 <- lmer(f0z ~ robf0Normal : DimOverallImpression : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
+
+summary(no1 <- lmer(f0z ~ robf0Normal : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
+anova(oi1, no1)
 ```
 
 Now check how robust this is with `robPreviousf0Mock`:
