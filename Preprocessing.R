@@ -466,7 +466,7 @@ questionnaire <- data.frame(questionNumber = c(1:12),
                                           "positiveAboutRob",
                                           "positiveAboutConv",
                                           "comfortTalkingToRob"),
-                            dimension = c(rep("Dim:convFlow", 4), rep("Dim:humanlikeness", 4), rep("Dim:overallImpression", 4)))
+                            dimension = c(rep("DimConvFlow", 4), rep("DimHumanlikeness", 4), rep("DimOverallImpression", 4)))
 
 dacsave <- dac
 dac <- dacsave
