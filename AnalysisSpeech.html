@@ -1798,7 +1798,8 @@ robot’s f0?)</p>
 <p>If we make a model with the interaction of <code>robot&#39;s f0</code>
 and <code>condition</code> and a main effect of <code>intimacy</code>,
 we get: * main effect of <code>intimacy</code>: higher intimacy = lower
-f0 * <code>robot&#39;s f0 : condition</code>: robot’S f0 predicts human’s f0
+f0 (i.e., intimacy does not affect <em>convergence</em>, only f0 itself)
+* <code>robot&#39;s f0 : condition</code>: robot’S f0 predicts human’s f0
 only in the staring condition (i.e., the finding we had already reported
 in the P&amp;P paper)</p>
 <p>This seems the easiest model to explain, and with nicer results to
@@ -1833,39 +1834,6 @@ talk about. But is this p-hacking?</p>
 ## intimMean   -0.492              
 ## rbf0Nrml:NG -0.432 -0.005       
 ## rbf0Nrml:GA -0.386 -0.030  0.439</code></pre>
-<p>(Find a way to visualize the relationship of f0z ~ robf0Normal * <a href="#bfi">BFI</a> * condition. e.g. heat map with facet_wrap?)</p>
-<pre class="r"><code># ggplot(dac, aes(IntellectOpenness, robf0Normal))+
-#   geom_point()+
-#   facet_wrap(~condition)+
-#   geom_smooth(method = &quot;lm&quot;)+
-#   ggtitle(&quot;IntellectOpenness&quot;)
-# 
-# ggplot(dac, aes(Extraversion, robf0Normal))+
-#   geom_point()+
-#   facet_wrap(~condition)+
-#   geom_smooth(method = &quot;lm&quot;)+
-#   ggtitle(&quot;Extraversion&quot;)
-# 
-# ggplot(dac, aes(EmotionalStability, robf0Normal))+
-#   geom_point()+
-#   facet_wrap(~condition)+
-#   geom_smooth(method = &quot;lm&quot;)+
-#   ggtitle(&quot;EmotionalStability&quot;)
-# 
-# ggplot(dac, aes(Agreeableness, robf0Normal))+
-#   geom_point()+
-#   facet_wrap(~condition)+
-#   geom_smooth(method = &quot;lm&quot;)+
-#   ggtitle(&quot;Agreeableness&quot;)
-# 
-# d &lt;- as.matrix(dac %&gt;% select(Conscientiousness, f0z, robf0Normal))
-# wireframe(f0z ~ Conscientiousness * robf0Normal, dac %&gt;% filter)
-# 
-# ggplot(dac, aes(robf0Normal, f0z))+
-#   geom_contour()+
-#   # facet_wrap(~condition)+
-#   # geom_smooth(method = &quot;lm&quot;)+
-#   ggtitle(&quot;Conscientiousness&quot;)</code></pre>
 <div id="bfi" class="section level3">
 <h3>BFI</h3>
 <p>For each BFI dimension, I compared a model
@@ -1875,7 +1843,7 @@ without the dimension. All the models with the BFI dimension show a t
 the NG condition (but not GA condition). But since I wouldn’t expect
 that all BFI dimensions would predict convergence, I am comparing the
 AICs of the models with and without BFI. When the AIC of the model
-<em>with</em> BFI is lower (even with the added varialbe), then we can
+<em>with</em> BFI is lower (even with the added variable), then we can
 maybe assume that the BFI effect is meaningful.</p>
 <p><strong>Conclusion</strong> about BFI dimesions:</p>
 <p>The only BFI dimension that predicted convergence was
@@ -2231,12 +2199,46 @@ Extraversion!</p>
 ##     npar     AIC     BIC logLik deviance  Chisq Df Pr(&gt;Chisq)
 ## ex1    7 -766.26 -725.43 390.13  -780.26                     
 ## no1    7 -768.53 -727.70 391.27  -782.53 2.2751  0</code></pre>
+<p>(Find a way to visualize the relationship of f0z ~ robf0Normal * <a href="#bfi">BFI</a> * condition. e.g. heat map with facet_wrap?)</p>
+<pre class="r"><code># ggplot(dac, aes(IntellectOpenness, robf0Normal))+
+#   geom_point()+
+#   facet_wrap(~condition)+
+#   geom_smooth(method = &quot;lm&quot;)+
+#   ggtitle(&quot;IntellectOpenness&quot;)
+# 
+# ggplot(dac, aes(Extraversion, robf0Normal))+
+#   geom_point()+
+#   facet_wrap(~condition)+
+#   geom_smooth(method = &quot;lm&quot;)+
+#   ggtitle(&quot;Extraversion&quot;)
+# 
+# ggplot(dac, aes(EmotionalStability, robf0Normal))+
+#   geom_point()+
+#   facet_wrap(~condition)+
+#   geom_smooth(method = &quot;lm&quot;)+
+#   ggtitle(&quot;EmotionalStability&quot;)
+# 
+# ggplot(dac, aes(Agreeableness, robf0Normal))+
+#   geom_point()+
+#   facet_wrap(~condition)+
+#   geom_smooth(method = &quot;lm&quot;)+
+#   ggtitle(&quot;Agreeableness&quot;)
+# 
+# d &lt;- as.matrix(dac %&gt;% select(Conscientiousness, f0z, robf0Normal))
+# wireframe(f0z ~ Conscientiousness * robf0Normal, dac %&gt;% filter)
+# 
+# ggplot(dac, aes(robf0Normal, f0z))+
+#   geom_contour()+
+#   # facet_wrap(~condition)+
+#   # geom_smooth(method = &quot;lm&quot;)+
+#   ggtitle(&quot;Conscientiousness&quot;)</code></pre>
 </div>
 <div id="questionnaire-dimensions" class="section level3">
 <h3>Questionnaire dimensions</h3>
 <p>same procedure as for the BFI dimensions.</p>
-<p>Conclusion of questionnaire dimensions. No dimensions predict
-convergence. See details for each dimension below.</p>
+<p><strong>Conclusion</strong> of questionnaire dimensions: None of the
+dimensions predicts convergence. See details for each dimension
+below.</p>
 <p><code>DimConvFlow</code>: AIC is the same</p>
 <pre class="r"><code>summary(cf1 &lt;- lmer(f0z ~ robf0Normal : DimConvFlow : condition + (1 + condition | speaker), dac %&gt;% filter(!grepl(&quot;Robot&quot;, speaker))))</code></pre>
 <pre><code>## Linear mixed model fit by REML [&#39;lmerMod&#39;]

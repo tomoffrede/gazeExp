@@ -154,7 +154,7 @@ summary(f1 <- lmer(f0z ~ intimMean + robf0Normal : condition + (1 + condition | 
 
 ### BFI
 
-For each BFI dimension, I compared a model `f0 ~ robot's f0 : condition : [BFI dimension]` to one without the dimension. All the models with the BFI dimension show a t > 2 for the effect of `robot's f0` and `BFI` in the NG condition (but not GA condition). But since I wouldn't expect that all BFI dimensions would predict convergence, I am comparing the AICs of the models with and without BFI. When the AIC of the model *with* BFI is lower (even with the added varialbe), then we can maybe assume that the BFI effect is meaningful.
+For each BFI dimension, I compared a model `f0 ~ robot's f0 : condition : [BFI dimension]` to one without the dimension. All the models with the BFI dimension show a t > 2 for the effect of `robot's f0` and `BFI` in the NG condition (but not GA condition). But since I wouldn't expect that all BFI dimensions would predict convergence, I am comparing the AICs of the models with and without BFI. When the AIC of the model *with* BFI is lower (even with the added variable), then we can maybe assume that the BFI effect is meaningful.
 
 **Conclusion** about BFI dimesions:
 
@@ -257,7 +257,7 @@ anova(ex1, no1)
 
 same procedure as for the BFI dimensions.
 
-Conclusion of questionnaire dimensions. No dimensions predict convergence. See details for each dimension below.
+**Conclusion** of questionnaire dimensions: None of the dimensions predicts convergence. See details for each dimension below.
 
 `DimConvFlow`: AIC is the same
 
