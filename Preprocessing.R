@@ -450,6 +450,27 @@ dac <- dac %>%
 dac <- full_join(dac, q, by=c("scenario", "turn")) %>% 
   rename("intimMean"="mean", "intimMed"="median", "intimSD"="SD")
 
+##############
+## PCA
+
+dpG <- dac %>% 
+  filter(!grepl("Robot", speaker)) %>%
+  select(speaker, GA.1:GA.12) %>% 
+  distinct()
+names(dpG) <- c("speaker", paste0("I", 1:12))
+dpN <- dac %>% 
+  filter(!grepl("Robot", speaker)) %>%
+  select(speaker, NG.1:NG.12) %>% 
+  distinct()
+names(dpN) <- c("speaker", paste0("I", 1:12))
+dp <- rbind(dpN, dpG)
+
+summary(pc <- prcomp(dp[c(2:13)], center=TRUE, scale=TRUE))
+screeplot(pc, type="l")
+cumpro <- cumsum(pc$sdev^2 / sum(pc$sdev^2))
+plot(cumpro[0:12], xlab = "PC #", ylab = "Amount of explained variance", main = "Cumulative variance plot")
+
+
 # rename questionnaire columns so they make sense
 # also get rid of all the TMF columns: transform them into on TMF.F and one TMF.M
 
