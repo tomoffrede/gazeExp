@@ -34,10 +34,10 @@ dac <- dac %>%
   mutate_at(c("speaker", "condition", "Order", "task"), as.factor) %>% 
   group_by(speaker) %>%
   mutate(turnDurNormal = (turnDur - min(turnDur, na.rm = TRUE)) / (max(turnDur, na.rm = TRUE) - min(turnDur, na.rm = TRUE)),
-         f0z = (f0mean - min(f0mean, na.rm = TRUE)) / (max(f0mean, na.rm = TRUE) - min(f0mean, na.rm = TRUE)),
-         gapDurNormal = (gapDur - min(gapDur, na.rm = TRUE)) / (max(gapDur, na.rm = TRUE) - min(gapDur, na.rm = TRUE)), 
-         f0DiffNormal = (f0Diff - min(f0Diff, na.rm = TRUE)) / (max(f0Diff, na.rm = TRUE) - min(f0Diff, na.rm = TRUE)),
-         robf0Normal = (robPrevf0 - min(robPrevf0, na.rm=TRUE)) / (max(robPrevf0, na.rm=TRUE) - min(robPrevf0, na.rm=TRUE))) %>%
+         turnDurZ = (turnDur - mean(turnDur, na.rm=TRUE)) / sd(turnDur, na.rm=TRUE),
+         robf0Normal = (robPrevf0 - min(robPrevf0, na.rm=TRUE)) / (max(robPrevf0, na.rm=TRUE) - min(robPrevf0, na.rm=TRUE)),
+         robf0Z = (robPrevf0 - mean(robPrevf0, na.rm=TRUE)) / sd(robPrevf0, na.rm=TRUE),
+         intimZ = (intimMean - mean(intimMean, na.rm=TRUE)) / sd(intimMean, na.rm=TRUE)) %>%
   ungroup()
 
 dab <- dab %>%
@@ -51,49 +51,44 @@ dab <- dab %>%
 # Between-Turn Gap Duration
 
 ```{r}
-ggplot(dac, aes(condition, gapDurNormal))+
+ggplot(dac, aes(condition, gapDur))+
   geom_boxplot()
 
-ggplot(dac, aes(turnNormal, gapDurNormal))+
-  geom_point()+
-  facet_wrap(~condition)+
-  geom_smooth(method="loess")
-
-ggplot(dac, aes(turnNormal, gapDurNormal))+
+ggplot(dac, aes(turnNormal, gapDur))+
   geom_point()+
   facet_wrap(~condition)+
   geom_smooth(method="loess")
 ```
 
+* There is a `turn` effect: longer gaps throughout the interaction. This model was better than the one using `intimacy` values
+* There is **no `condition` effect**
 
-* There is a `condition` effect: between-turn gaps are longer in the `NG` condition (in line with our  hypothesis)
-* There is a `turn` effect: gaps are longer the further into the conversation in both conditions (makes sense: questions get harder and more intimate)
-* There is a `condition:turn` effect: gaps get longer throughout the conversation in the `GA` condition than in the `NG` condition.
-* There is an `intimacy` effect: longer gaps before more intimate questions (but these questions were also harder to answer! So it's probably mostly because of that)
 
 ```{r}
 dac$condition <- relevel(dac$condition, ref="NG")
-summary(g1 <- lmer(gapDurNormal ~ condition * turnNormal + intimMean + (1 + condition | speaker), dac))
+summary(g1 <- lmer(gapDur ~ condition * turnNormal + (1 + condition | speaker), dac))
+summary(g2 <- lmer(gapDur ~ condition * intimZ + (1 + condition | speaker), dac))
+anova(g1, g2)
 ```
 
 # Turn Duration
 
 ```{r}
-ggplot(dac %>% filter(!grepl("Robot", speaker)), aes(condition, turnDurNormal))+
+ggplot(dac %>% filter(!grepl("Robot", speaker)), aes(condition, turnDur))+
   geom_boxplot()
 
-ggplot(dac %>% filter(!grepl("Robot", speaker)), aes(turnNormal, turnDurNormal))+
+ggplot(dac %>% filter(!grepl("Robot", speaker)), aes(turnNormal, turnDur))+
   geom_point()+
   facet_wrap(~condition)+
   geom_smooth(method="loess")
 ```
 
+* There is a `turn` effect: the further into the conversation, the longer the turns
+* There is a `turn : condition` interaction: in the GA condition (robot looks away; i.e. objectively more humanlike) the turns get longer throughout the conversation
 
 The order of the `turn` has a .95 correlation with `intimacy` ratings, since the questions always followed the same order. So we can't say if turn duration got higher with the progression of the conversation or because the questions got more intimate, or simply because the questions got more elaborate (so people had more things to talk about).
 
-So if we make a model with `turn` or `intimacy`, both give the same results -- the one with `turn` showing slightly larger effect sizes.
-
-
+So if we make a model with `turn` or `intimacy`, both give the same results -- the one with `turn` showing slightly larger effect sizes. The model with `turn` also has considerably lower AIC.
 
 ```{r}
 cor.test(dac$turnNormal, dac$intimMean)
@@ -101,7 +96,9 @@ cor.test(dac$turnNormal, dac$intimMean)
 dac$condition <- relevel(dac$condition, ref="NG")
 summary(t1 <- lmer(turnDur ~ condition * turnNormal + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
 
-summary(t1 <- lmer(turnDur ~ condition * intimMean + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
+summary(t2 <- lmer(turnDur ~ condition * intimMean + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
+
+anova(t1, t2)
 ```
 
 # f0 during conversation
@@ -109,7 +106,7 @@ summary(t1 <- lmer(turnDur ~ condition * intimMean + (1 + condition | speaker), 
 ## Using the f0 from the IPUs of the robot's previous turn as predictors for the f0 of the IPUs of the human's current turn
 
 ```{r}
-ggplot(dac %>% filter(!grepl("Robot", speaker)), aes(robf0Normal, f0z))+
+ggplot(dac %>% filter(!grepl("Robot", speaker)), aes(robf0Normal, f0mean))+
   geom_point()+
   facet_wrap(~condition)+
   geom_smooth(method="lm")
@@ -120,104 +117,118 @@ ggplot(dac %>% filter(!grepl("Robot", speaker)), aes(intimMean, f0mean))+
   geom_smooth(method="lm")
 ```
 
-
 There seem to be effects of `intimacy` and `robot's f0` in interaction with `condition`. However, I am not sure what model to use.
 
 If we make a model only with (`interaction of intimacy and condition` + `interaction of robot's f0 and condition`), the only |t| > 2 is:
+
 * `no-GA condition : robot's f0`: the robot's f0 predicts the human's f0 only in the no-gaze aversion condition). See:
 
 ```{r}
 dac$condition <- relevel(dac$condition, ref="NG")
 
-summary(f1 <- lmer(f0z ~ intimMean : condition + robf0Normal : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
+summary(f1 <- lmer(f0mean ~ intimZ : condition + robf0Normal : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
 ```
 
-
 If we make a model including all the main effects plus two-way interactions between the three variables, we get:
-* mean effect of `intimacy`: lower f0 with higher intimacy
+
 * `intimacy : robot's f0`: positive effect of this interaction (so for a given value of intimacy, human's f0 gets higher for higher robot's f0?)
+* `condition : robot's f0`: robot's f0 positively predicts human's f0 only in NG condition
 
 ```{r}
-summary(f1 <- lmer(f0z ~ (intimMean + condition + robf0Normal)^2 + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
+summary(f1 <- lmer(f0z ~ (intimZ + condition + robf0Normal)^2 + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
 ```
 
 If we make a model with the interaction of `robot's f0` and `condition` and a main effect of `intimacy`, we get:
-* main effect of `intimacy`: higher intimacy = lower f0 (i.e., intimacy does not affect *convergence*, only f0 itself)
+
 * `robot's f0 : condition`: robot'S f0 predicts human's f0 only in the staring condition (i.e., the finding we had already reported in the P&P paper)
+* (Intimacy tends to reduce f0, but this doesn't reach significance)
 
 This seems the easiest model to explain, and with nicer results to talk about. But is this p-hacking?
 
 ```{r}
-summary(f1 <- lmer(f0z ~ intimMean + robf0Normal : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
+summary(f1 <- lmer(f0mean ~ intimZ + robf0Normal : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
 ```
 
 
 ### BFI
 
-For each BFI dimension, I compared a model `f0 ~ robot's f0 : condition : [BFI dimension]` to one without the dimension. All the models with the BFI dimension show a t > 2 for the effect of `robot's f0` and `BFI` in the NG condition (but not GA condition). But since I wouldn't expect that all BFI dimensions would predict convergence, I am comparing the AICs of the models with and without BFI. When the AIC of the model *with* BFI is lower (even with the added variable), then we can maybe assume that the BFI effect is meaningful.
+For each BFI dimension, I compared a model `f0 ~ robot's f0 : condition : [BFI dimension]` to one without the dimension. Many of the models with the BFI dimension show a t > 2 for the effect of `robot's f0` and `BFI` in the NG condition (but not GA condition). But since I wouldn't expect that all BFI dimensions would predict convergence, I am comparing the AICs of the models with and without BFI. When the AIC of the model *with* BFI is lower (even with the added variable), then we can maybe assume that the BFI effect is meaningful.
 
 **Conclusion** about BFI dimesions:
 
-The only BFI dimension that predicted convergence was `Extraversion`. See details for each BFI dimension below.
+Maybe emotional stability (I think also called neuroticism) is the only potentially good predictor.
 
-`Intellect/Openness`: AIC of model with BFI dimension is not lower.
+#### Intellect/Openness
+
+AIC of model with BFI dimension is not lower.
 
 ```{r}
-summary(intel1 <- lmer(f0z ~ robf0Normal : IntellectOpenness : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
+summary(intel1 <- lmer(f0mean ~ robf0Normal : IntellectOpenness : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
 
-summary(no1 <- lmer(f0z ~ robf0Normal : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
+summary(no1 <- lmer(f0mean ~ robf0Normal : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
 anova(intel1, no1)
 ```
 
-`Agreeableness`: AIC is the same in both models
+#### Agreeableness
+
+AIC is the same in both models
 
 ```{r}
 d <- dac %>%
   filter(!grepl("Robot", speaker)) %>% 
-  select(f0z, robf0Normal, Agreeableness, condition, speaker) %>% 
+  select(f0mean, robf0Normal, Agreeableness, condition, speaker) %>% 
   na.omit()
 
-summary(agree1 <- lmer(f0z ~ robf0Normal : Agreeableness : condition + (1 + condition | speaker), d))
+summary(agree1 <- lmer(f0mean ~ robf0Normal : Agreeableness : condition + (1 + condition | speaker), d))
 
-summary(no1 <- lmer(f0z ~ robf0Normal : condition + (1 + condition | speaker), d))
+summary(no1 <- lmer(f0mean ~ robf0Normal : condition + (1 + condition | speaker), d))
 anova(agree1, no1)
 ```
-`Conscientiousness`: same AIC
+#### Conscientiousness
+
+same AIC
 
 ```{r}
 d <- dac %>%
   filter(!grepl("Robot", speaker)) %>% 
-  select(f0z, robf0Normal, Conscientiousness, condition, speaker) %>% 
+  select(f0mean, robf0Normal, Conscientiousness, condition, speaker) %>% 
   na.omit()
 
-summary(con1 <- lmer(f0z ~ robf0Normal : Conscientiousness : condition + (1 + condition | speaker), d))
+summary(con1 <- lmer(f0mean ~ robf0Normal : Conscientiousness : condition + (1 + condition | speaker), d))
 
-summary(no1 <- lmer(f0z ~ robf0Normal : condition + (1 + condition | speaker), d))
+summary(no1 <- lmer(f0mean ~ robf0Normal : condition + (1 + condition | speaker), d))
 anova(con1, no1)
 ```
 
-`EmotionalStability`: same AIC
+#### EmotionalStability
+
+same AIC, but slightly lower BIC and lower t value in model with the dimension
 
 ```{r}
 d <- dac %>%
   filter(!grepl("Robot", speaker)) %>% 
-  select(f0z, robf0Normal, EmotionalStability, condition, speaker) %>% 
+  select(f0mean, robf0Normal, EmotionalStability, condition, speaker) %>% 
   na.omit()
 
-summary(em1 <- lmer(f0z ~ robf0Normal : EmotionalStability : condition + (1 + condition | speaker), d))
+summary(em1 <- lmer(f0mean ~ robf0Normal : EmotionalStability : condition + (1 + condition | speaker), d))
 
-summary(no1 <- lmer(f0z ~ robf0Normal : condition + (1 + condition | speaker), d))
+summary(no1 <- lmer(f0mean ~ robf0Normal : condition + (1 + condition | speaker), d))
 anova(em1, no1)
 ```
-`Extraversion`: AIC is lower in model with Extraversion!
+
+#### Extraversion
+
+AIC higher, and t value < 2 in model with dimension
 
 ```{r}
-summary(ex1 <- lmer(f0z ~ robf0Normal : Extraversion : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
+summary(ex1 <- lmer(f0mean ~ robf0Normal : Extraversion : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
 
-summary(no1 <- lmer(f0z ~ robf0Normal : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
+summary(no1 <- lmer(f0mean ~ robf0Normal : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
 anova(ex1, no1)
 ```
-(Find a way to visualize the relationship of f0z ~ robf0Normal * [BFI] * condition. e.g. heat map with facet_wrap?)
+
+
+(Find a way to visualize the relationship of f0mean ~ robf0Normal * [BFI] * condition. e.g. heat map with facet_wrap?)
 ```{r}
 # ggplot(dac, aes(IntellectOpenness, robf0Normal))+
 #   geom_point()+
@@ -243,14 +254,91 @@ anova(ex1, no1)
 #   geom_smooth(method = "lm")+
 #   ggtitle("Agreeableness")
 # 
-# d <- as.matrix(dac %>% select(Conscientiousness, f0z, robf0Normal))
-# wireframe(f0z ~ Conscientiousness * robf0Normal, dac %>% filter)
+# d <- as.matrix(dac %>% select(Conscientiousness, f0mean, robf0Normal))
+# wireframe(f0mean ~ Conscientiousness * robf0Normal, dac %>% filter)
 # 
-# ggplot(dac, aes(robf0Normal, f0z))+
+# ggplot(dac, aes(robf0Normal, f0mean))+
 #   geom_contour()+
 #   # facet_wrap(~condition)+
 #   # geom_smooth(method = "lm")+
 #   ggtitle("Conscientiousness")
+```
+
+
+### BFI without condition
+
+**Conclusion** about BFI dimesions (without `condition` included in the models):
+
+Potential dimensions: `Intellect/Openness`, `Agreeableness`, `Extraversion`
+
+#### Intellect/Openness
+
+same AIC, though t value in model with the dimension is slightly higher
+
+```{r}
+summary(intel1 <- lmer(f0mean ~ robf0Normal : IntellectOpenness + (1 | speaker), dac %>% filter(!grepl("Robot", speaker))))
+
+summary(no1 <- lmer(f0mean ~ robf0Normal + (1 | speaker), dac %>% filter(!grepl("Robot", speaker))))
+anova(intel1, no1)
+```
+
+#### Agreeableness
+
+AIC slightly lower and t value slightly higher in model with the dimension
+
+```{r}
+d <- dac %>%
+  filter(!grepl("Robot", speaker)) %>% 
+  select(f0mean, robf0Normal, Agreeableness, condition, speaker) %>% 
+  na.omit()
+
+summary(agree1 <- lmer(f0mean ~ robf0Normal : Agreeableness + (1 | speaker), d))
+
+summary(no1 <- lmer(f0mean ~ robf0Normal + (1 | speaker), d))
+anova(agree1, no1)
+```
+
+#### Conscientiousness
+
+AIC slightly lower and t value slightly higher in model with the dimension
+
+```{r}
+d <- dac %>%
+  filter(!grepl("Robot", speaker)) %>% 
+  select(f0mean, robf0Normal, Conscientiousness, condition, speaker) %>% 
+  na.omit()
+
+summary(con1 <- lmer(f0mean ~ robf0Normal : Conscientiousness + (1 | speaker), d))
+
+summary(no1 <- lmer(f0mean ~ robf0Normal + (1 | speaker), d))
+anova(con1, no1)
+```
+
+#### EmotionalStability
+
+AIC slightly higher and t value lower
+
+```{r}
+d <- dac %>%
+  filter(!grepl("Robot", speaker)) %>% 
+  select(f0mean, robf0Normal, EmotionalStability, condition, speaker) %>% 
+  na.omit()
+
+summary(em1 <- lmer(f0mean ~ robf0Normal : EmotionalStability + (1 | speaker), d))
+
+summary(no1 <- lmer(f0mean ~ robf0Normal + (1 | speaker), d))
+anova(em1, no1)
+```
+
+#### Extraversion
+
+AIC slightly lower and t value higher in model with the dimension
+
+```{r}
+summary(ex1 <- lmer(f0mean ~ robf0Normal : Extraversion + (1 | speaker), dac %>% filter(!grepl("Robot", speaker))))
+
+summary(no1 <- lmer(f0mean ~ robf0Normal  + (1 | speaker), dac %>% filter(!grepl("Robot", speaker))))
+anova(ex1, no1)
 ```
 
 ### Questionnaire dimensions
@@ -259,31 +347,40 @@ same procedure as for the BFI dimensions.
 
 **Conclusion** of questionnaire dimensions: None of the dimensions predicts convergence. See details for each dimension below.
 
-`DimConvFlow`: AIC is the same
+#### Dimension: Conversation Flow
+
+AIC slightly lower and t value higher in model with dimension
 
 ```{r}
-summary(cf1 <- lmer(f0z ~ robf0Normal : DimConvFlow : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
+summary(cf1 <- lmer(f0mean ~ robf0Normal : DimConvFlow : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
 
-summary(no1 <- lmer(f0z ~ robf0Normal : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
+summary(no1 <- lmer(f0mean ~ robf0Normal : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
 anova(cf1, no1)
 ```
-`DimHumanlikeness`: AIC is the same
+
+#### Dimension: Humanlikeness
+
+AIC slightly lower and t value higher in model with dimension
 
 ```{r}
-summary(hl1 <- lmer(f0z ~ robf0Normal : DimHumanlikeness : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
+summary(hl1 <- lmer(f0mean ~ robf0Normal : DimHumanlikeness : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
 
-summary(no1 <- lmer(f0z ~ robf0Normal : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
+summary(no1 <- lmer(f0mean ~ robf0Normal : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
 anova(hl1, no1)
 ```
 
-`DimOverallImpression`: AIC increased a bit with the dimension.
+#### Dimension: Overall Impression
+
+AIC lower and t value higher in model with dimension. This is the only time the AIC difference is actually 2 (the conventional threshold).
 
 ```{r}
-summary(oi1 <- lmer(f0z ~ robf0Normal : DimOverallImpression : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
+summary(oi1 <- lmer(f0mean ~ robf0Normal : DimOverallImpression : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
 
-summary(no1 <- lmer(f0z ~ robf0Normal : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
+summary(no1 <- lmer(f0mean ~ robf0Normal : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
 anova(oi1, no1)
 ```
+
+### Checking with mock f0 data
 
 Now check how robust this is with `robPreviousf0Mock`:
 
@@ -291,7 +388,7 @@ Here no effect shows up for `robot's MOCK f0`, so we can probably take the findi
 
 ```{r}
 dac$condition <- relevel(dac$condition, ref="GA")
-summary(f2 <- lmer(f0z ~ intimMean + robPrevf0Mock : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
+summary(f2 <- lmer(f0mean ~ intimMean + robPrevf0Mock : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
 ```
 
 
@@ -304,16 +401,10 @@ dat <- dac %>%
 
 
 ```{r}
-ggplot(dat, aes(condition, f0DiffNormal))+
-  geom_boxplot()
 ggplot(dat, aes(condition, f0Diff))+
   geom_boxplot()
 
 ggplot(dat, aes(turnNormal, f0Diff))+
-  geom_point()+
-  facet_wrap(~condition)+
-  geom_smooth(method="lm")
-ggplot(dat, aes(turnNormal, f0DiffNormal))+
   geom_point()+
   facet_wrap(~condition)+
   geom_smooth(method="lm")
@@ -322,7 +413,7 @@ ggplot(dat, aes(turnNormal, f0DiffNormal))+
 Using this method we don't see any effect on f0.
 
 ```{r}
-summary(ft1 <- lmer(f0DiffNormal ~ condition * turnNormal + (1 + condition | speaker), dat))
+summary(ft1 <- lmer(f0Diff ~ condition * turnNormal + (1 + condition | speaker), dat))
 ```
 
 # f0 during baseline
@@ -331,22 +422,20 @@ summary(ft1 <- lmer(f0DiffNormal ~ condition * turnNormal + (1 + condition | spe
 ggplot(dab, aes(robPrevf0, f0mean))+
   geom_point()+
   facet_wrap(~condition)+
-  geom_smooth(method="lm")
+  geom_smooth(method="loess")
 ```
 
-The model below would suggest that only for the NG condition, the robot's f0 in the PREVIOUS interaction *negatively* predicted the human's f0 in the following baseline recording.
+There is no lasting convergence effect.
 
 ```{r}
 dab$condition <- relevel(dab$condition, ref="GA")
-summary(fb2 <- lmer(f0mean ~ robPrevf0 * condition + (1 | speaker), dab))
+summary(fb2 <- lmer(f0mean ~ robPrevf0 : condition + (1 | speaker), dab))
 ```
 
-If we test the effect of some **mock data** (f0 of the robot the person hasn't interacted with yet), `robot's previous f0` doesn't show an effect.
+Similar result with robot's *mock* f0.
 
 ```{r}
-summary(fbM <- lmer(f0mean ~ robPrevf0Mock * condition + (1 | speaker), dab))
+summary(fbM <- lmer(f0mean ~ robPrevf0Mock : condition + (1 | speaker), dab))
 ```
-
-If we use f0z instead of f0, the results look even less robust. We can assume there was no lasting convergence effect.
 
 
