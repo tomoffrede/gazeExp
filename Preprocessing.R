@@ -3,6 +3,7 @@
 library(rPraat)
 library(tidyverse)
 library(lme4)
+library(parameters) # for PCA
 `%!in%` <- Negate(`%in%`)
 
 folder <- "C:/Users/offredet/Documents/1HU/ExperimentEyes/Data/All/"
@@ -465,29 +466,27 @@ dpN <- dac %>%
 names(dpN) <- c("speaker", paste0("I", 1:12))
 dp <- rbind(dpN, dpG)
 
-summary(pc <- prcomp(dp[c(2:13)], center=TRUE, scale=TRUE))
-screeplot(pc, type="l")
-cumpro <- cumsum(pc$sdev^2 / sum(pc$sdev^2))
-plot(cumpro[0:12], xlab = "PC #", ylab = "Amount of explained variance", main = "Cumulative variance plot")
-
+pc <- principal_components(dp[,2:13], n = 3, threshold = 0., standardize = TRUE, rotation="varimax")
+summary(pc)
+# write.csv(pc, paste0(folder, "loadings2.csv"))
 
 # rename questionnaire columns so they make sense
 # also get rid of all the TMF columns: transform them into on TMF.F and one TMF.M
 
 questionnaire <- data.frame(questionNumber = c(1:12),
                             question = c("conversationFlow",
-                                          "floorYield",
-                                          "floorHold",
-                                          "robTiming",
-                                          "faceHumanlike",
-                                          "voiceHumanlike",
-                                          "behaviorHumanlike",
-                                          "generalHumanlike",
-                                          "enjoyTalkingToRob",
-                                          "positiveAboutRob",
-                                          "positiveAboutConv",
-                                          "comfortTalkingToRob"),
-                            dimension = c(rep("DimConvFlow", 4), rep("DimHumanlikeness", 4), rep("DimOverallImpression", 4)))
+                                         "floorYield",
+                                         "floorHold",
+                                         "robTiming",
+                                         "faceHumanlike",
+                                         "voiceHumanlike",
+                                         "behaviorHumanlike",
+                                         "generalHumanlike",
+                                         "enjoyTalkingToRob",
+                                         "positiveAboutRob",
+                                         "positiveAboutConv",
+                                         "comfortTalkingToRob"),
+                            dimension = c(rep("PCConvQuality", 3), rep("PCRobotQuality", 4), NA, rep("PCConvQuality", 4))) # these components are based on the PCA above
 
 dacsave <- dac
 dac <- dacsave
