@@ -16,6 +16,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r, include=FALSE}
 library(tidyverse)
 library(lme4)
+library(ggdist)
 
 `%!in%` <- Negate(`%in%`)
 
@@ -347,38 +348,28 @@ same procedure as for the BFI dimensions.
 
 **Conclusion** of questionnaire dimensions: None of the dimensions predicts convergence. See details for each dimension below.
 
-#### Dimension: Conversation Flow
+#### Principal Component: Conversation Quality
 
-AIC slightly lower and t value higher in model with dimension
+People that rated the conversation higher on quality (my name for this component) converged more on f0.
 
 ```{r}
-summary(cf1 <- lmer(f0mean ~ robf0Normal : DimConvFlow : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
+summary(cf1 <- lmer(f0mean ~ robf0Normal : PCConvQuality + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
 
-summary(no1 <- lmer(f0mean ~ robf0Normal : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
+summary(no1 <- lmer(f0mean ~ robf0Normal + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
 anova(cf1, no1)
 ```
 
-#### Dimension: Humanlikeness
+#### Principal Component: Robot's Quality
 
-AIC slightly lower and t value higher in model with dimension
+Also, people that rated the robot higher on quality (my name for this component) converged more on f0.
 
 ```{r}
-summary(hl1 <- lmer(f0mean ~ robf0Normal : DimHumanlikeness : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
+summary(hl1 <- lmer(f0mean ~ robf0Normal : PCRobotQuality + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
 
-summary(no1 <- lmer(f0mean ~ robf0Normal : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
+summary(no1 <- lmer(f0mean ~ robf0Normal + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
 anova(hl1, no1)
 ```
 
-#### Dimension: Overall Impression
-
-AIC lower and t value higher in model with dimension. This is the only time the AIC difference is actually 2 (the conventional threshold).
-
-```{r}
-summary(oi1 <- lmer(f0mean ~ robf0Normal : DimOverallImpression : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
-
-summary(no1 <- lmer(f0mean ~ robf0Normal : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
-anova(oi1, no1)
-```
 
 ### Checking with mock f0 data
 
@@ -436,6 +427,37 @@ Similar result with robot's *mock* f0.
 
 ```{r}
 summary(fbM <- lmer(f0mean ~ robPrevf0Mock : condition + (1 | speaker), dab))
+```
+
+
+# Questionnaire ratings and condition
+
+
+```{r}
+ggplot(dac, aes(condition, PCConvQuality))+
+  stat_halfeye(adjust = .5,  width = .5, justification = -.2, .width = c(.5, .95), fill="#9bafbd")+
+  geom_boxplot(width=.13, notch = TRUE)
+
+ggplot(dac, aes(condition, PCConvQuality))+
+  geom_boxplot()
+```
+
+
+```{r}
+summary(cq1 <- lmer(PCConvQuality ~ condition + (1|speaker), dac))
+
+```
+
+
+```{r}
+ggplot(dac, aes(condition, PCRobotQuality))+
+  stat_halfeye(adjust = .5,  width = .5, justification = -.2, .width = c(.5, .95), fill="#9bafbd")+
+  geom_boxplot(width=.13, notch = TRUE)
+```
+
+
+```{r}
+summary(cq1 <- lmer(PCRobotQuality ~ condition + (1|speaker), dac))
 ```
 
 
