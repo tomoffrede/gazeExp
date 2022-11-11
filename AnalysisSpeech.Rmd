@@ -22,13 +22,13 @@ library(ggdist)
 
 folder <- "C:/Users/offredet/Documents/1HU/ExperimentEyes/Data/All/"
 files <- list.files(folder, "RData")
-fileConv <- files[grepl("Conversation", files) & !grepl("Including", files)]
 fileBase <- files[grepl("Baseline", files)]
+fileConv <- files[grepl("Conversation", files) & !grepl("Including", files)]
 
 load(paste0(folder, fileBase))
 load(paste0(folder, fileConv))
 
-dac <- dac[!grepl("TMF|BFI|Impairment|Dyslexia|Gender|Education|Age", names(dac))]
+dac <- dac[!grepl("Impairment|Dyslexia|Gender|Education|Age", names(dac))]
 
 dac <- dac %>%
   mutate_at(c("turnDur", "turn", "f0mean", "robPrevf0", "gapDur", "intimMean", "intimSD", "intimMed"), as.numeric) %>%
@@ -36,9 +36,9 @@ dac <- dac %>%
   group_by(speaker) %>%
   mutate(turnDurNormal = (turnDur - min(turnDur, na.rm = TRUE)) / (max(turnDur, na.rm = TRUE) - min(turnDur, na.rm = TRUE)),
          turnDurZ = (turnDur - mean(turnDur, na.rm=TRUE)) / sd(turnDur, na.rm=TRUE),
-         robf0Normal = (robPrevf0 - min(robPrevf0, na.rm=TRUE)) / (max(robPrevf0, na.rm=TRUE) - min(robPrevf0, na.rm=TRUE)),
          robf0Z = (robPrevf0 - mean(robPrevf0, na.rm=TRUE)) / sd(robPrevf0, na.rm=TRUE),
-         intimZ = (intimMean - mean(intimMean, na.rm=TRUE)) / sd(intimMean, na.rm=TRUE)) %>%
+         intimZ = (intimMean - mean(intimMean, na.rm=TRUE)) / sd(intimMean, na.rm=TRUE)
+         ) %>%
   ungroup()
 
 dab <- dab %>%
@@ -104,15 +104,43 @@ anova(t1, t2)
 
 # f0 during conversation
 
+## Look closer at f0 throughout time
+
+```{r}
+folderRobF0 <- "C:/Users/offredet/Documents/1HU/ExperimentEyes/Data/RobotsF0/"
+dat <- dac %>% filter(grepl("Robot", speaker))
+
+for(r in unique(dat$speaker)){
+  ggplot(dat %>% filter(speaker==r), aes(as.numeric(timeIndexOverall), f0mean))+
+    geom_point()+
+    facet_wrap(~condition)+
+    geom_smooth(method="loess")
+  ggsave(paste0(folderRobF0, r, ".png"))
+}
+
+folderPartF0 <- "C:/Users/offredet/Documents/1HU/ExperimentEyes/Data/ParticipantsF0/"
+dat <- dac %>% filter(!grepl("Robot", speaker))
+
+for(r in unique(dat$speaker)){
+  ggplot(dat %>% filter(speaker==r), aes(as.numeric(timeIndexOverall), f0mean))+
+    geom_point()+
+    facet_wrap(~condition)+
+    geom_smooth(method="loess")
+  ggsave(paste0(folderPartF0, r, ".png"))
+}
+```
+
+
+
 ## Using the f0 from the IPUs of the robot's previous turn as predictors for the f0 of the IPUs of the human's current turn
 
 ```{r}
-ggplot(dac %>% filter(!grepl("Robot", speaker)), aes(robf0Normal, f0mean))+
+ggplot(dac, aes(robf0Z, f0mean))+
   geom_point()+
   facet_wrap(~condition)+
   geom_smooth(method="lm")
 
-ggplot(dac %>% filter(!grepl("Robot", speaker)), aes(intimMean, f0mean))+
+ggplot(dac, aes(intimMean, f0mean))+
   geom_point()+
   facet_wrap(~condition)+
   geom_smooth(method="lm")
@@ -127,7 +155,7 @@ If we make a model only with (`interaction of intimacy and condition` + `interac
 ```{r}
 dac$condition <- relevel(dac$condition, ref="NG")
 
-summary(f1 <- lmer(f0mean ~ intimZ : condition + robf0Normal : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
+summary(f1 <- lmer(f0mean ~ intimZ : condition + robf0Z : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
 ```
 
 If we make a model including all the main effects plus two-way interactions between the three variables, we get:
@@ -136,7 +164,7 @@ If we make a model including all the main effects plus two-way interactions betw
 * `condition : robot's f0`: robot's f0 positively predicts human's f0 only in NG condition
 
 ```{r}
-summary(f1 <- lmer(f0z ~ (intimZ + condition + robf0Normal)^2 + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
+summary(f1 <- lmer(f0mean ~ (intimZ + condition + robf0Z)^2 + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
 ```
 
 If we make a model with the interaction of `robot's f0` and `condition` and a main effect of `intimacy`, we get:
@@ -147,7 +175,7 @@ If we make a model with the interaction of `robot's f0` and `condition` and a ma
 This seems the easiest model to explain, and with nicer results to talk about. But is this p-hacking?
 
 ```{r}
-summary(f1 <- lmer(f0mean ~ intimZ + robf0Normal : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
+summary(f1 <- lmer(f0mean ~ intimZ + robf0Z : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
 ```
 
 
@@ -164,9 +192,9 @@ Maybe emotional stability (I think also called neuroticism) is the only potentia
 AIC of model with BFI dimension is not lower.
 
 ```{r}
-summary(intel1 <- lmer(f0mean ~ robf0Normal : IntellectOpenness : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
+summary(intel1 <- lmer(f0mean ~ robf0Z : IntellectOpenness : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
 
-summary(no1 <- lmer(f0mean ~ robf0Normal : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
+summary(no1 <- lmer(f0mean ~ robf0Z : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
 anova(intel1, no1)
 ```
 
@@ -177,12 +205,12 @@ AIC is the same in both models
 ```{r}
 d <- dac %>%
   filter(!grepl("Robot", speaker)) %>% 
-  select(f0mean, robf0Normal, Agreeableness, condition, speaker) %>% 
+  select(f0mean, robf0Z, Agreeableness, condition, speaker) %>% 
   na.omit()
 
-summary(agree1 <- lmer(f0mean ~ robf0Normal : Agreeableness : condition + (1 + condition | speaker), d))
+summary(agree1 <- lmer(f0mean ~ robf0Z : Agreeableness : condition + (1 + condition | speaker), d))
 
-summary(no1 <- lmer(f0mean ~ robf0Normal : condition + (1 + condition | speaker), d))
+summary(no1 <- lmer(f0mean ~ robf0Z : condition + (1 + condition | speaker), d))
 anova(agree1, no1)
 ```
 #### Conscientiousness
@@ -192,12 +220,12 @@ same AIC
 ```{r}
 d <- dac %>%
   filter(!grepl("Robot", speaker)) %>% 
-  select(f0mean, robf0Normal, Conscientiousness, condition, speaker) %>% 
+  select(f0mean, robf0Z, Conscientiousness, condition, speaker) %>% 
   na.omit()
 
-summary(con1 <- lmer(f0mean ~ robf0Normal : Conscientiousness : condition + (1 + condition | speaker), d))
+summary(con1 <- lmer(f0mean ~ robf0Z : Conscientiousness : condition + (1 + condition | speaker), d))
 
-summary(no1 <- lmer(f0mean ~ robf0Normal : condition + (1 + condition | speaker), d))
+summary(no1 <- lmer(f0mean ~ robf0Z : condition + (1 + condition | speaker), d))
 anova(con1, no1)
 ```
 
@@ -208,12 +236,12 @@ same AIC, but slightly lower BIC and lower t value in model with the dimension
 ```{r}
 d <- dac %>%
   filter(!grepl("Robot", speaker)) %>% 
-  select(f0mean, robf0Normal, EmotionalStability, condition, speaker) %>% 
+  select(f0mean, robf0Z, EmotionalStability, condition, speaker) %>% 
   na.omit()
 
-summary(em1 <- lmer(f0mean ~ robf0Normal : EmotionalStability : condition + (1 + condition | speaker), d))
+summary(em1 <- lmer(f0mean ~ robf0Z : EmotionalStability : condition + (1 + condition | speaker), d))
 
-summary(no1 <- lmer(f0mean ~ robf0Normal : condition + (1 + condition | speaker), d))
+summary(no1 <- lmer(f0mean ~ robf0Z : condition + (1 + condition | speaker), d))
 anova(em1, no1)
 ```
 
@@ -222,43 +250,43 @@ anova(em1, no1)
 AIC higher, and t value < 2 in model with dimension
 
 ```{r}
-summary(ex1 <- lmer(f0mean ~ robf0Normal : Extraversion : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
+summary(ex1 <- lmer(f0mean ~ robf0Z : Extraversion : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
 
-summary(no1 <- lmer(f0mean ~ robf0Normal : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
+summary(no1 <- lmer(f0mean ~ robf0Z : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
 anova(ex1, no1)
 ```
 
 
-(Find a way to visualize the relationship of f0mean ~ robf0Normal * [BFI] * condition. e.g. heat map with facet_wrap?)
+(Find a way to visualize the relationship of f0mean ~ robf0Z * [BFI] * condition. e.g. heat map with facet_wrap?)
 ```{r}
-# ggplot(dac, aes(IntellectOpenness, robf0Normal))+
+# ggplot(dac, aes(IntellectOpenness, robf0Z))+
 #   geom_point()+
 #   facet_wrap(~condition)+
 #   geom_smooth(method = "lm")+
 #   ggtitle("IntellectOpenness")
 # 
-# ggplot(dac, aes(Extraversion, robf0Normal))+
+# ggplot(dac, aes(Extraversion, robf0Z))+
 #   geom_point()+
 #   facet_wrap(~condition)+
 #   geom_smooth(method = "lm")+
 #   ggtitle("Extraversion")
 # 
-# ggplot(dac, aes(EmotionalStability, robf0Normal))+
+# ggplot(dac, aes(EmotionalStability, robf0Z))+
 #   geom_point()+
 #   facet_wrap(~condition)+
 #   geom_smooth(method = "lm")+
 #   ggtitle("EmotionalStability")
 # 
-# ggplot(dac, aes(Agreeableness, robf0Normal))+
+# ggplot(dac, aes(Agreeableness, robf0Z))+
 #   geom_point()+
 #   facet_wrap(~condition)+
 #   geom_smooth(method = "lm")+
 #   ggtitle("Agreeableness")
 # 
-# d <- as.matrix(dac %>% select(Conscientiousness, f0mean, robf0Normal))
-# wireframe(f0mean ~ Conscientiousness * robf0Normal, dac %>% filter)
+# d <- as.matrix(dac %>% select(Conscientiousness, f0mean, robf0Z))
+# wireframe(f0mean ~ Conscientiousness * robf0Z, dac %>% filter)
 # 
-# ggplot(dac, aes(robf0Normal, f0mean))+
+# ggplot(dac, aes(robf0Z, f0mean))+
 #   geom_contour()+
 #   # facet_wrap(~condition)+
 #   # geom_smooth(method = "lm")+
@@ -277,9 +305,9 @@ Potential dimensions: `Intellect/Openness`, `Agreeableness`, `Extraversion`
 same AIC, though t value in model with the dimension is slightly higher
 
 ```{r}
-summary(intel1 <- lmer(f0mean ~ robf0Normal : IntellectOpenness + (1 | speaker), dac %>% filter(!grepl("Robot", speaker))))
+summary(intel1 <- lmer(f0mean ~ robf0Z : IntellectOpenness + (1 | speaker), dac %>% filter(!grepl("Robot", speaker))))
 
-summary(no1 <- lmer(f0mean ~ robf0Normal + (1 | speaker), dac %>% filter(!grepl("Robot", speaker))))
+summary(no1 <- lmer(f0mean ~ robf0Z + (1 | speaker), dac %>% filter(!grepl("Robot", speaker))))
 anova(intel1, no1)
 ```
 
@@ -290,12 +318,12 @@ AIC slightly lower and t value slightly higher in model with the dimension
 ```{r}
 d <- dac %>%
   filter(!grepl("Robot", speaker)) %>% 
-  select(f0mean, robf0Normal, Agreeableness, condition, speaker) %>% 
+  select(f0mean, robf0Z, Agreeableness, condition, speaker) %>% 
   na.omit()
 
-summary(agree1 <- lmer(f0mean ~ robf0Normal : Agreeableness + (1 | speaker), d))
+summary(agree1 <- lmer(f0mean ~ robf0Z : Agreeableness + (1 | speaker), d))
 
-summary(no1 <- lmer(f0mean ~ robf0Normal + (1 | speaker), d))
+summary(no1 <- lmer(f0mean ~ robf0Z + (1 | speaker), d))
 anova(agree1, no1)
 ```
 
@@ -306,12 +334,12 @@ AIC slightly lower and t value slightly higher in model with the dimension
 ```{r}
 d <- dac %>%
   filter(!grepl("Robot", speaker)) %>% 
-  select(f0mean, robf0Normal, Conscientiousness, condition, speaker) %>% 
+  select(f0mean, robf0Z, Conscientiousness, condition, speaker) %>% 
   na.omit()
 
-summary(con1 <- lmer(f0mean ~ robf0Normal : Conscientiousness + (1 | speaker), d))
+summary(con1 <- lmer(f0mean ~ robf0Z : Conscientiousness + (1 | speaker), d))
 
-summary(no1 <- lmer(f0mean ~ robf0Normal + (1 | speaker), d))
+summary(no1 <- lmer(f0mean ~ robf0Z + (1 | speaker), d))
 anova(con1, no1)
 ```
 
@@ -322,12 +350,12 @@ AIC slightly higher and t value lower
 ```{r}
 d <- dac %>%
   filter(!grepl("Robot", speaker)) %>% 
-  select(f0mean, robf0Normal, EmotionalStability, condition, speaker) %>% 
+  select(f0mean, robf0Z, EmotionalStability, condition, speaker) %>% 
   na.omit()
 
-summary(em1 <- lmer(f0mean ~ robf0Normal : EmotionalStability + (1 | speaker), d))
+summary(em1 <- lmer(f0mean ~ robf0Z : EmotionalStability + (1 | speaker), d))
 
-summary(no1 <- lmer(f0mean ~ robf0Normal + (1 | speaker), d))
+summary(no1 <- lmer(f0mean ~ robf0Z + (1 | speaker), d))
 anova(em1, no1)
 ```
 
@@ -336,9 +364,9 @@ anova(em1, no1)
 AIC slightly lower and t value higher in model with the dimension
 
 ```{r}
-summary(ex1 <- lmer(f0mean ~ robf0Normal : Extraversion + (1 | speaker), dac %>% filter(!grepl("Robot", speaker))))
+summary(ex1 <- lmer(f0mean ~ robf0Z : Extraversion + (1 | speaker), dac %>% filter(!grepl("Robot", speaker))))
 
-summary(no1 <- lmer(f0mean ~ robf0Normal  + (1 | speaker), dac %>% filter(!grepl("Robot", speaker))))
+summary(no1 <- lmer(f0mean ~ robf0Z  + (1 | speaker), dac %>% filter(!grepl("Robot", speaker))))
 anova(ex1, no1)
 ```
 
@@ -353,9 +381,9 @@ same procedure as for the BFI dimensions.
 People that rated the conversation higher on quality (my name for this component) converged more on f0.
 
 ```{r}
-summary(cf1 <- lmer(f0mean ~ robf0Normal : PCConvQuality + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
+summary(cf1 <- lmer(f0mean ~ robf0Z : PCConvQuality + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
 
-summary(no1 <- lmer(f0mean ~ robf0Normal + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
+summary(no1 <- lmer(f0mean ~ robf0Z + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
 anova(cf1, no1)
 ```
 
@@ -364,9 +392,9 @@ anova(cf1, no1)
 Also, people that rated the robot higher on quality (my name for this component) converged more on f0.
 
 ```{r}
-summary(hl1 <- lmer(f0mean ~ robf0Normal : PCRobotQuality + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
+summary(hl1 <- lmer(f0mean ~ robf0Z : PCRobotQuality + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
 
-summary(no1 <- lmer(f0mean ~ robf0Normal + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
+summary(no1 <- lmer(f0mean ~ robf0Z + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
 anova(hl1, no1)
 ```
 
@@ -442,10 +470,20 @@ ggplot(dac, aes(condition, PCConvQuality))+
   geom_boxplot()
 ```
 
+From the graphs, you'd think there's even no difference between conditions or that `GA` has slightly higher ratings. The regression is being confusing about it:
+
+* If you include a random slope of `condition` per `speaker`, the model doesn't converge
+* If you only include the random intercept for `speaker`, the condition `NG` seems to have quite higher ratings.
+
+(Model's residuals: homoskedastic (good) but far from normally distributed.)
 
 ```{r}
 summary(cq1 <- lmer(PCConvQuality ~ condition + (1|speaker), dac))
 
+par(mfrow=c(2,2))
+plot(fitted(cq1), resid(cq1))
+hist(resid(cq1))
+qqnorm(resid(cq1));qqline(resid(cq1))
 ```
 
 
@@ -455,9 +493,17 @@ ggplot(dac, aes(condition, PCRobotQuality))+
   geom_boxplot(width=.13, notch = TRUE)
 ```
 
+For the "robot's quality" ratings, the `NG` condition was rated higher -- opposite from our hypothesis.
+
+(Model's residuals: also homoskedastic (good), and distribution isn't very normal but better than the conversational quality model above.)
 
 ```{r}
-summary(cq1 <- lmer(PCRobotQuality ~ condition + (1|speaker), dac))
+summary(rq1 <- lmer(PCRobotQuality ~ condition + (1|speaker), dac))
+
+par(mfrow=c(2,2))
+plot(fitted(rq1), resid(rq1))
+hist(resid(rq1))
+qqnorm(resid(rq1));qqline(resid(rq1))
 ```
 
 
