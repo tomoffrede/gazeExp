@@ -350,18 +350,18 @@ for(i in 1:nrow(dac)){ # getting `robPrevf0` for the Conversation dataset
 }
 
 for(i in 1:nrow(dab)){
-  previousf0 <- dab$f0mean[dab$speaker == dab$interlocutor[i] &
-                           dab$condition == dab$prevCond[i] &
-                           dab$timeIndexOverall == dab$timeIndexOverall[i]]
+  previousf0 <- dac$f0mean[dac$speaker == dab$interlocutor[i] &
+                             dac$condition == dab$prevCond[i] &
+                             dac$timeIndexOverall == dab$timeIndexOverall[i]]
   if(!purrr::is_empty(previousf0)){
     if(!any(is.na(previousf0))){
       dab$robPrevf0[i] <- previousf0
     }
   }
   if(dab$condition[i] == substr(dab$Order[i], 1, 2)){
-    previousf0Mock <- as.numeric(dab$f0mean[dab$speaker == dab$interlocutor[i] &
-                                 dab$condition == dab$condition[i] &
-                                 dab$timeIndexOverall == dab$timeIndexOverall[i]])
+    previousf0Mock <- as.numeric(dac$f0mean[dac$speaker == dab$interlocutor[i] &
+                                              dac$condition == dab$condition[i] &
+                                              dac$timeIndexOverall == dab$timeIndexOverall[i]])
     if(!purrr::is_empty(previousf0Mock)){
       if(!any(is.na(previousf0Mock))){
         dab$robPrevf0Mock[i] <- previousf0Mock
