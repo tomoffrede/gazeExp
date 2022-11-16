@@ -4,10 +4,10 @@ output: html_document
 date: '2022-07-05'
 ---
 
-```{r}
+```{r, include=FALSE}
 library(tidyverse)
-folder <- "C:/Users/tomof/Documents/1HU/ExperimentEyes/Data/"
-meta <- list.files(folder, "csv")
+folder <- "C:/Users/offredet/Documents/1HU/ExperimentEyes/Data/"
+meta <- list.files(folder, "metadata")
 
 dat <- read.csv(paste0(folder, meta)) %>%
   select("Participant", "Age", "Gender", "HearingImpairment", "SpeechImpairment", "Dyslexia", "VisionImpairment", "Education", "L1", "TMF.M1":"TMF.F6") %>%
@@ -15,7 +15,11 @@ dat <- read.csv(paste0(folder, meta)) %>%
          TMF.F = (TMF.F1 + TMF.F2 + TMF.F3 + TMF.F4 + TMF.F5 + TMF.F6) / 6) %>%
   mutate_at(c("TMF.M", "TMF.F"), as.numeric) %>%
   select(-c("TMF.M1":"TMF.F6"))
-names(dat)
+```
+
+
+```{r}
+head(dat)
 ```
 
 ```{r}
@@ -35,9 +39,35 @@ sd(dat$TMF.M)
 ```
 
 ```{r}
-sort(table(dat$L1), decreasing=TRUE)
-length(unique(dat$L1)) # 18 different languages
-# 7 swedish, 4 dutch, 3 french, 3 spanish, 2 english, 1 of each of the others
+# first make sure that each row counts one language, so we get a notion of how many native speakers each language has (independently of whether a given speaker also has other L1s)
+
+langs <- data.frame(table(dat$L1))
+names(langs) <- c("language", "count")
+langs$language <- as.character(langs$language)
+tempL <- data.frame(matrix(nrow=0, ncol=3))
+names(tempL) <- c("language", "count", "rowN")
+for(i in 1:nrow(langs)){
+  if(grepl(";", langs$language[i])){
+    l1 <- strsplit(as.character(langs$language[i]), split=";")[[1]][[1]]
+    l2 <- strsplit(as.character(langs$language[i]), split=";")[[1]][[2]]
+    c <- langs$count[i]
+    tempL[nrow(tempL)+1,] <- c(l1, c, i)
+    tempL[nrow(tempL)+1,] <- c(l2, c, i)
+  }
+}
+langs <- langs %>% slice(-c(unique(as.integer(tempL$rowN))))
+for(i in 1:nrow(tempL)){
+  if(any(grepl(tempL$language[i], unique(langs$language)))){
+    langs$count[langs$language==tempL$language[i]] <- as.integer(langs$count[langs$language==tempL$language[i]]) + as.integer(tempL$count[i])
+  } else{
+    langs[nrow(langs)+1,] <- c(tempL$language[i], tempL$count[i])
+  }
+}
+langs$language <- as.factor(langs$language)
+remove(tempL)
+
+arrange(langs, desc(count))
+length(unique(langs$language)) # 17 different languages
 ```
 
 ```{r}
