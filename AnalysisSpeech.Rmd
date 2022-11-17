@@ -147,29 +147,24 @@ ggplot(dac, aes(intimMean, f0mean))+
   geom_smooth(method="loess")
 ```
 
-There seem to be effects of `intimacy` and `robot's f0` in interaction with `condition`. However, I am not sure what model to use.
-
-If we make a model only with (`interaction of intimacy and condition` + `interaction of robot's f0 and condition`), the only |t| > 2 is:
+There is an effect of `robot's f0` in interaction with `condition`.
 
 * `condition : robot's f0`: the robot's f0 predicts the human's f0 only in the staring condition. 
-* `conditoion : intimacy`: f0 gets lower with higher intimacy only in the the gaze aversion condition.
+
 See:
 
 ```{r}
 dac$condition <- relevel(dac$condition, ref="NG")
 
-summary(f1 <- lmer(f0mean ~ intimZ : condition + robf0Z : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
+summary(f1 <- lmer(f0mean ~ robf0Z : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
 ```
 
-If we make a model with the interaction of `robot's f0` and `condition` and a main effect of `intimacy`, we get:
+### Intimacy
 
-* `robot's f0 : condition`: robot'S f0 predicts human's f0 only in the staring condition (i.e., the finding we had already reported in the P&P paper)
-* `intimacy`: lower f0 for higher intimacy
-
-Since in the intimacy ~ f0 graph f0 also seems to reduce (less strongly) with higher intimacy, I'd say we could report this model.
+* `condition : intimacy`: f0 gets lower with higher intimacy.
 
 ```{r}
-summary(f1 <- lmer(f0mean ~ intimZ + robf0Z : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
+summary(f1 <- lmer(f0mean ~ intimZ + (1 | speaker), dac %>% filter(!grepl("Robot", speaker))))
 ```
 
 
@@ -330,7 +325,7 @@ anova(cf1, no1)
 AIC is slightly lower and t value higher. So there seems to be a tendency for people to converge more to the robot they rated as higher quality.
 
 ```{r}
-summary(hl1 <- lmer(f0mean ~ robf0Z : PCRobotQuality + (1 | speaker), dac %>% filter(!grepl("Robot", speaker))))
+summary(hl1 <- lmer(f0mean ~ robf0Z : PCRobotQuality + (1  | speaker), dac %>% filter(!grepl("Robot", speaker))))
 
 summary(no1 <- lmer(f0mean ~ robf0Z + (1 | speaker), dac %>% filter(!grepl("Robot", speaker))))
 anova(hl1, no1)
