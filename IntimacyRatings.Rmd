@@ -222,11 +222,13 @@ dt <- dat[dat$Participant %!in% bad,] # we need to use the wide data format
 
 dt$Participant <- 1:nrow(dt)
 
+length(unique(dt$Participant)) # 130 participants
+
 # but now turn it into long again
 
 dl <- gather(dt, Question, Rating, Q1:Q28)
 ```
-
+We used the ratings of 130 participants.
 
 ## Per question
 
