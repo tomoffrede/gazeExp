@@ -9,8 +9,8 @@ library(tidyverse)
 folder <- "C:/Users/offredet/Documents/1HU/ExperimentEyes/Data/"
 meta <- list.files(folder, "metadata")
 
-dat <- read.csv(paste0(folder, meta)) %>%
-  select("Participant", "Age", "Gender", "HearingImpairment", "SpeechImpairment", "Dyslexia", "VisionImpairment", "Education", "L1", "TMF.M1":"TMF.F6") %>%
+dat <- read.csv(paste0(folder, meta), sep=";") %>%
+  select("Participant", "Age", "Gender", "HearingImpairment", "SpeechImpairment", "Dyslexia", "VisionImpairment", "Education", "L1", "TMF.M1":"TMF.F6", "scoreEN") %>%
   mutate(TMF.M = (TMF.M1 + TMF.M2 + TMF.M3 + TMF.M4 + TMF.M5 + TMF.M6) / 6,
          TMF.F = (TMF.F1 + TMF.F2 + TMF.F3 + TMF.F4 + TMF.F5 + TMF.F6) / 6) %>%
   mutate_at(c("TMF.M", "TMF.F"), as.numeric) %>%
@@ -47,9 +47,9 @@ langs$language <- as.character(langs$language)
 tempL <- data.frame(matrix(nrow=0, ncol=3))
 names(tempL) <- c("language", "count", "rowN")
 for(i in 1:nrow(langs)){
-  if(grepl(";", langs$language[i])){
-    l1 <- strsplit(as.character(langs$language[i]), split=";")[[1]][[1]]
-    l2 <- strsplit(as.character(langs$language[i]), split=";")[[1]][[2]]
+  if(grepl("_", langs$language[i])){
+    l1 <- strsplit(as.character(langs$language[i]), split="_")[[1]][[1]]
+    l2 <- strsplit(as.character(langs$language[i]), split="_")[[1]][[2]]
     c <- langs$count[i]
     tempL[nrow(tempL)+1,] <- c(l1, c, i)
     tempL[nrow(tempL)+1,] <- c(l2, c, i)
@@ -70,9 +70,18 @@ arrange(langs, desc(count))
 length(unique(langs$language)) # 17 different languages
 ```
 
+
 ```{r}
 table(dat$HearingImpairment) # no hearing impairment
 table(dat$SpeechImpairment) # no speech impairment
 table(dat$Dyslexia) # 1 dyslexic
 table(dat$VisionImpairment) # 28 no vision impairment, 5 corrected-to-normal vision
+```
+
+```{r}
+summary(dat$scoreEN)
+hist(dat$scoreEN)
+dat <- dat %>% 
+  mutate(levelEN = ifelse(scoreEN >= 80, "C1-C2", ifelse(scoreEN < 80 & scoreEN > 60, "B2", "B1<")))
+table(dat$levelEN)
 ```
