@@ -289,7 +289,7 @@ folder2 <- "C:/Users/offredet/Documents/1HU/ExperimentEyes/Data/"
 file <- list.files(folder2, "\\.csv")
 file <- file[grepl("metadata", file)]
 
-m <- read.csv(paste0(folder2, file)) %>% 
+m <- read.csv(paste0(folder2, file), sep=";") %>% 
   rename(participant = Participant)
 
 dam <- merge(dat, m, by="participant")

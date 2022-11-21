@@ -39,7 +39,8 @@ dac <- dac %>%
          robf0Z = (robPrevf0 - mean(robPrevf0, na.rm=TRUE)) / sd(robPrevf0, na.rm=TRUE),
          intimZ = (intimMean - mean(intimMean, na.rm=TRUE)) / sd(intimMean, na.rm=TRUE)
          ) %>%
-  ungroup()
+  ungroup() #%>% 
+  # filter(scoreEN > 60) # see with and without low-level participants
 
 dab <- dab %>%
   mutate_at(c("condition"), as.factor)
