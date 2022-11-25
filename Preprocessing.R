@@ -416,7 +416,7 @@ dpN <- dac %>%
 names(dpN) <- c("speaker", paste0("I", 1:12))
 dp <- rbind(dpN, dpG)
 
-pc <- principal_components(dp[,2:13], n = 3, threshold = 0., standardize = TRUE, rotation="varimax")
+pc <- principal_components(dp[,2:13], n = 3, threshold = 0.3, standardize = TRUE, rotation="varimax")
 summary(pc)
 # write.csv(pc, paste0(folder, "loadings2.csv"))
 
@@ -449,7 +449,10 @@ daq <- dac %>%
   mutate(questionNumber = substr(condition, 4, nchar(condition)),
          condition = substr(condition, 1, 2))
 
+daqsave <- daq
+
 daq <- merge(daq, questionnaire, by="questionNumber") %>% 
+  filter(!is.na(dimension)) %>% 
   group_by(speaker, dimension, condition) %>% 
   mutate(dimensionRating = mean(rating, na.rm=TRUE)) %>%
   ungroup() %>% 
@@ -519,7 +522,7 @@ db <- db %>%
   summarise_all(coalesce_by_column)
 
 dac <- merge(dac, db, by="speaker", all=TRUE) %>% 
-  select(-c(BFI1:BFI40))
+  select(-c(BFI1:BFI40, X))
 
 # save files
 
