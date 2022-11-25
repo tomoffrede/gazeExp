@@ -43,8 +43,11 @@ dac <- dac %>%
          Agreec = Agreeableness - mean(Agreeableness, na.rm=TRUE),
          Conscc = Conscientiousness - mean(Conscientiousness, na.rm=TRUE),
          Extrac = Extraversion - mean(Extraversion, na.rm=TRUE),
-         IOc = IntellectOpenness - mean(IntellectOpenness, na.rm=TRUE)) # %>% 
+         IOc = IntellectOpenness - mean(IntellectOpenness, na.rm=TRUE),
+         ConvQualc = PCConvQuality - mean(PCConvQuality, na.rm=TRUE),
+         RobQualc = PCRobotQuality - mean(PCRobotQuality, na.=TRUE)) # %>% 
   # filter(scoreEN > 60) # see with and without low-level participants
+
 
 dab <- dab %>%
   mutate_at(c("condition"), as.factor)
@@ -173,7 +176,11 @@ ggplot(dac, aes(intimMean, f0mean))+
 * `intimacy`: f0 gets lower with higher intimacy.
 
 ```{r}
-summary(f1 <- lmer(f0mean ~ intimc + (1  | speaker), dac %>% filter(!grepl("Robot", speaker))))
+summary(f1 <- lmer(f0mean ~ intimc + (1 | speaker), dac %>% filter(!grepl("Robot", speaker))))
+par(mfrow=c(2,2))
+hist(resid(f1))
+qqnorm(resid(f1));qqline(resid(f1))
+plot(fitted(f1, resid(f1)))
 ```
 
 
@@ -187,7 +194,6 @@ Maybe emotional stability (I think also called neuroticism) is the only potentia
 
 #### Intellect/Openness
 
-AIC of model with BFI dimension is higher.
 
 ```{r}
 summary(intel1 <- lmer(f0mean ~ robf0c : IOc : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
@@ -198,7 +204,6 @@ anova(intel1, no1)
 
 #### Agreeableness
 
-AIC is the same in both models.
 
 ```{r}
 d <- dac %>%
@@ -206,14 +211,13 @@ d <- dac %>%
   select(f0mean, robf0c, Agreec, Agreeableness, condition, speaker) %>% 
   na.omit()
 
-summary(agree1 <- lmer(f0mean ~ robf0c : Agreec : condition + (1 | speaker), d))
+summary(agree1 <- lmer(f0mean ~ robf0c : Agreec : condition + (1 +condition| speaker), d))
 
-summary(no1 <- lmer(f0mean ~ robf0c : condition + (1 | speaker), d))
+summary(no1 <- lmer(f0mean ~ robf0c : condition + (1+condition | speaker), d))
 anova(agree1, no1)
 ```
 #### Conscientiousness
 
-same AIC
 
 ```{r}
 d <- dac %>%
@@ -229,8 +233,7 @@ anova(con1, no1)
 
 #### EmotionalStability
 
-AIC of model with `emotional stability` is lower, and t value is higher.
-(I have tried adding intimacy ratings in the interaction, but it makes the model a lot worse (AIC and t value). This makes sense since the interaction gets more and more complex.)
+
 
 ```{r}
 d <- dac %>%
@@ -239,67 +242,19 @@ d <- dac %>%
   na.omit()
 
 summary(em1c <- lmer(f0mean ~ robf0c : ESc : condition + (1 + condition | speaker), d))
-summary(em1 <- lmer(f0mean ~ robf0c : EmotionalStability : condition + (1 + condition | speaker), d))
-
 
 summary(no1 <- lmer(f0mean ~ robf0c : condition + (1 + condition | speaker), d))
 anova(em1c, no1)
-
-
-summary(em1 <- lmer(f0mean ~ robf0c : EmotionalStability : condition + (1 + condition | speaker), d))
-
-summary(no1 <- lmer(f0mean ~ robf0c : condition + (1 + condition | speaker), d))
-anova(em1, no1)
-
 ```
 
 #### Extraversion
 
-AIC higher
 
 ```{r}
 summary(ex1 <- lmer(f0mean ~ robf0c : Extrac : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
 
 summary(no1 <- lmer(f0mean ~ robf0c : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
 anova(ex1, no1)
-```
-
-
-
-(Find a way to visualize the relationship of f0mean ~ robf0c * [BFI] * condition. e.g. heat map with facet_wrap?)
-```{r}
-# ggplot(dac, aes(IOc, robf0c))+
-#   geom_point()+
-#   facet_wrap(~condition)+
-#   geom_smooth(method = "lm")+
-#   ggtitle("IntellectOpenness")
-# 
-# ggplot(dac, aes(Extrac, robf0c))+
-#   geom_point()+
-#   facet_wrap(~condition)+
-#   geom_smooth(method = "lm")+
-#   ggtitle("Extraversion")
-# 
-# ggplot(dac, aes(ESc, robf0c))+
-#   geom_point()+
-#   facet_wrap(~condition)+
-#   geom_smooth(method = "lm")+
-#   ggtitle("Emotional Stability")
-# 
-# ggplot(dac, aes(Agreec, robf0c))+
-#   geom_point()+
-#   facet_wrap(~condition)+
-#   geom_smooth(method = "lm")+
-#   ggtitle("Agreeableness")
-# 
-# d <- as.matrix(dac %>% select(Conscc, f0mean, robf0c))
-# wireframe(f0mean ~ Conscc * robf0c, dac %>% filter)
-# 
-# ggplot(dac, aes(robf0c, f0mean))+
-#   geom_contour()+
-#   # facet_wrap(~condition)+
-#   # geom_smooth(method = "lm")+
-#   ggtitle("Conscientiousness")
 ```
 
 
@@ -333,7 +288,7 @@ These 2 dimensions were obtained through a PCA of the questionnaire ratings. I a
 AIC is slightly lower and t value higher. People that rated the conversation as better quality (see above) seemed to converge to the robot more.
 
 ```{r}
-summary(cf1 <- lmer(f0mean ~ robf0c : PCConvQuality + (1 | speaker), dac %>% filter(!grepl("Robot", speaker))))
+summary(cf1 <- lmer(f0mean ~ robf0c : ConvQualc + (1 | speaker), dac %>% filter(!grepl("Robot", speaker))))
 
 summary(no1 <- lmer(f0mean ~ robf0c + (1 | speaker), dac %>% filter(!grepl("Robot", speaker))))
 anova(cf1, no1)
@@ -344,7 +299,7 @@ anova(cf1, no1)
 AIC is slightly lower and t value higher. So there seems to be a tendency for people to converge more to the robot they rated as higher quality.
 
 ```{r}
-summary(hl1 <- lmer(f0mean ~ robf0c : PCRobotQuality + (1  | speaker), dac %>% filter(!grepl("Robot", speaker))))
+summary(hl1 <- lmer(f0mean ~ robf0c : RobQualc + (1  | speaker), dac %>% filter(!grepl("Robot", speaker))))
 
 summary(no1 <- lmer(f0mean ~ robf0c + (1 | speaker), dac %>% filter(!grepl("Robot", speaker))))
 anova(hl1, no1)
