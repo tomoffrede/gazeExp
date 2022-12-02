@@ -201,8 +201,21 @@ dat <- f0 %>%
          groupings = paste(speaker, condition, task, sep = "."),
          tgroup = paste(groupings, turn, sep="."))
 
-{# for(i in unique(f0$participant)){
-#   dat0 <- f0 %>% filter(participant == i)
+intCO <- read.csv(paste0(folder, "intensityCO.csv"), sep="\t") %>% 
+  filter(segment=="") %>% 
+  select(File, start_segment, end_segment, dur_segment, intensity) %>% 
+  rename(file=File)
+
+intBL <- read.csv(paste0(folder, "intensityBL.csv"), sep="\t") %>% 
+  select(File, start_segment, end_segment, dur_segment, intensity) %>% 
+  rename(file=File)
+
+
+
+{
+# datp <- dat
+# for(i in unique(datp$speaker)){
+#   dat0 <- datp %>% filter(speaker == i)
 #   par(mfrow=c(3, 2))
 #   for(g in unique(dat0$groupings)){
 #     dat <- dat0 %>% filter(groupings == g)

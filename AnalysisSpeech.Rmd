@@ -31,7 +31,7 @@ load(paste0(folder, fileConv))
 dac <- dac[!grepl("Impairment|Dyslexia|Gender|Education|Age", names(dac))]
 
 dac <- dac %>%
-  mutate_at(c("turnDur", "turn", "f0mean", "robPrevf0", "gapDur", "intimMean", "intimSD", "intimMed"), as.numeric) %>%
+  mutate_at(c("turnDur", "turn", "f0mean", "robPrevf0", "gapDur", "intimMean", "intimSD", "intimMed", "IPUDur"), as.numeric) %>%
   mutate_at(c("speaker", "condition", "Order", "task"), as.factor) %>% 
   group_by(speaker) %>%
   mutate(turnDurNormal = (turnDur - min(turnDur, na.rm = TRUE)) / (max(turnDur, na.rm = TRUE) - min(turnDur, na.rm = TRUE)),
@@ -161,6 +161,11 @@ dac$condition <- relevel(dac$condition, ref="NG")
 
 summary(f1 <- lmer(f0mean ~ robf0c : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
 
+dac$IPUDurC <- dac$IPUDur - mean(dac$IPUDur, na.rm=TRUE)
+
+summary(f2 <- lmer(f0mean ~ robf0c : condition + IPUDurC + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
+summary(f1 <- lmer(f0mean ~ robf0c : condition  + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
+
 ```
 
 ### Intimacy
@@ -174,9 +179,13 @@ ggplot(dac, aes(intimMean, f0mean))+
 
 
 * `intimacy`: f0 gets lower with higher intimacy.
+* But intimacy does not modulate the effect of robot's f0 on human's f0 (regardless of whether we include condition in the model.)
 
 ```{r}
 summary(f1 <- lmer(f0mean ~ intimc + (1 | speaker), dac %>% filter(!grepl("Robot", speaker))))
+
+summary(f2 <- lmer(f0mean ~ intimc : robf0c : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
+
 par(mfrow=c(2,2))
 hist(resid(f1))
 qqnorm(resid(f1));qqline(resid(f1))
