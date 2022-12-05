@@ -28,7 +28,7 @@ files <- data.frame(cbind(filesTG, filesTXT))
 files <- files %>%
   mutate(worked = ifelse(substr(files$filesTG, 1, 9) == substr(files$filesTXT, 1, 9), "worked!", "NO!!!!"))
 
-f0 <- data.frame("file"=NA, "speaker"=NA, "turn"=NA, "turnOnset"=NA, "turnOffset"=NA, "turnDur"=NA, "IPU"=NA, "IPUOnset"=NA, "IPUOffset"=NA, "IPUDur"=NA, "timeIndexOverall"=NA, "timeIndexInTurn"=NA, "f0mean"=NA) %>% 
+f0 <- data.frame("file"=NA, "speaker"=NA, "turn"=NA, "turnOnset"=NA, "turnOffset"=NA, "turnDur"=NA, "IPU"=NA, "IPUOnset"=NA, "IPUOffset"=NA, "IPUDur"=NA, "f0mean"=NA) %>% 
   filter(!is.na(file))
 
 # do something like the following, but also calculating f0 mean per IPU (not entire turn)
@@ -41,39 +41,37 @@ for(i in 1:nrow(files)){
   
   if(substr(files$filesTG[i], 4, 5) == "BL"){ # baseline speech recordings
     ipuCount <- 0
-    timeIndexOverall <- 0
     startBL <- as.numeric(tg.getIntervalStartTime(tg, "speech", as.numeric(tg.findLabels(tg, "speech", "baseline"))))
     endBL <- as.numeric(tg.getIntervalEndTime(tg, "speech", as.numeric(tg.findLabels(tg, "speech", "baseline"))))
     for(p in 1:tg.getNumberOfIntervals(tg, "IPU")){
-      if(tg.getLabel(tg, "IPU", p)==""){ # if the interval is labeled as empty (vs. as "xxx"), it means it's an IPU
+      if(tg.getLabel(tg, "IPU", p)=="IPU"){
         startIPU <- as.numeric(tg.getIntervalStartTime(tg, "IPU", p))
         endIPU <- as.numeric(tg.getIntervalEndTime(tg, "IPU", p))
         if(startBL <= startIPU){ # doing two separate if() statements because there's some confusion with the use of &(&)
           if(endBL >= endIPU){
             ipuCount <- ipuCount + 1
+            f <- data.frame(matrix(nrow=0, ncol=1))
+            names(f) <- c("f0")
             for(l in 1:nrow(txt)){
               if(txt$onset[l] >= startIPU){
                 if(txt$offset[l] <= endIPU){
                   if(!is.na(txt$f0mean[l])){
-                    timeIndexOverall <- timeIndexOverall + 1
-                    timeIndexInTurn <- timeIndexOverall
-                    f0[nrow(f0)+1,] <- c(substr(files$filesTG[i], 1, 9),
-                                         substr(files$filesTG[i], 7, 9),
-                                         "baseline", # "turn"
-                                         startBL,
-                                         endBL,
-                                         as.numeric(endBL - startBL), # duration of entire baseline
-                                         ipuCount,
-                                         startIPU,
-                                         endIPU,
-                                         as.numeric(endIPU - startIPU), # duration of IPU
-                                         timeIndexOverall,
-                                         timeIndexInTurn,
-                                         as.numeric(txt$f0mean[l]))
+                    f[nrow(f)+1,] <- as.numeric(txt$f0mean[l])
                   }
                 }
               }
-            }  
+            }
+            f0[nrow(f0)+1,] <- c(substr(files$filesTG[i], 1, 9),
+                                 substr(files$filesTG[i], 7, 9),
+                                 "baseline", # "turn"
+                                 startBL,
+                                 endBL,
+                                 as.numeric(endBL - startBL), # duration of entire baseline
+                                 ipuCount,
+                                 startIPU,
+                                 endIPU,
+                                 as.numeric(endIPU - startIPU), # duration of IPU
+                                 mean(f$f0))
           }
         } 
       }
@@ -81,45 +79,41 @@ for(i in 1:nrow(files)){
   } else if(substr(files$filesTG[i], 4, 5) == "CO"){ # conversation
     turnCountHuman <- 0
     turnCountRobot <- 0
-    timeIndexOverallHuman <- 0
-    timeIndexOverallRobot <- 0
     for(n in 1:tg.getNumberOfIntervals(tg, "participant")){
       if(tg.getLabel(tg, "participant", n) == "sQ"){
         ipuCount <- 0
         turnCountHuman <- turnCountHuman + 1
-        timeIndexInTurnHuman <- 0
         turnOnset <- as.numeric(tg.getIntervalStartTime(tg, "participant", n))
         turnOffset <- as.numeric(tg.getIntervalEndTime(tg, "participant", n))
         for(p in 1:tg.getNumberOfIntervals(tg, "IPU")){
-          if(tg.getLabel(tg, "IPU", p)==""){ # if the interval is labeled as empty (vs. as "xxx"), it means it's an IPU
+          if(tg.getLabel(tg, "IPU", p)=="IPU"){
             startIPU <- as.numeric(tg.getIntervalStartTime(tg, "IPU", p))
             endIPU <- as.numeric(tg.getIntervalEndTime(tg, "IPU", p))
             if(turnOnset <= startIPU){ # doing two separate if() statements because there's some confusion with the use of &(&)
               if(turnOffset >= endIPU){
                 ipuCount <- ipuCount + 1
+                f <- data.frame(matrix(nrow=0, ncol=1))
+                names(f) <- c("f0")
                 for(l in 1:nrow(txt)){
                   if(txt$onset[l] >= startIPU){
                     if(txt$offset[l] <= endIPU){
                       if(!is.na(txt$f0mean[l])){
-                        timeIndexOverallHuman <- timeIndexOverallHuman + 1
-                        timeIndexInTurnHuman <- timeIndexInTurnHuman + 1
-                        f0[nrow(f0)+1,] <- c(substr(files$filesTG[i], 1, 9),
-                                             substr(files$filesTG[i], 7, 9),
-                                             turnCountHuman,
-                                             turnOnset,
-                                             turnOffset,
-                                             as.numeric(turnOffset - turnOnset), # duration of turn
-                                             ipuCount,
-                                             startIPU,
-                                             endIPU,
-                                             as.numeric(endIPU - startIPU), # duration of IPU
-                                             timeIndexOverallHuman,
-                                             timeIndexInTurnHuman,
-                                             as.numeric(txt$f0mean[l]))
+                        f[nrow(f)+1,] <- as.numeric(txt$f0mean[l])
                       }
                     }
                   }
                 }
+                f0[nrow(f0)+1,] <- c(substr(files$filesTG[i], 1, 9),
+                                     substr(files$filesTG[i], 7, 9),
+                                     turnCountHuman,
+                                     turnOnset,
+                                     turnOffset,
+                                     as.numeric(turnOffset - turnOnset), # duration of turn
+                                     ipuCount,
+                                     startIPU,
+                                     endIPU,
+                                     as.numeric(endIPU - startIPU), # duration of IPU
+                                     mean(f$f0))
               }
             }
           }
@@ -130,39 +124,37 @@ for(i in 1:nrow(files)){
       if(tg.getLabel(tg, "robot", n) == "sQ"){
         ipuCount <- 0
         turnCountRobot <- turnCountRobot + 1
-        timeIndexInTurnRobot <- 0
         turnOnset <- as.numeric(tg.getIntervalStartTime(tg, "robot", n))
         turnOffset <- as.numeric(tg.getIntervalEndTime(tg, "robot", n))
         for(p in 1:tg.getNumberOfIntervals(tg, "IPU")){
-          if(tg.getLabel(tg, "IPU", p)==""){ # if the interval is labeled as empty (vs. as "xxx"), it means it's an IPU
+          if(tg.getLabel(tg, "IPU", p)=="IPU"){
             startIPU <- as.numeric(tg.getIntervalStartTime(tg, "IPU", p))
             endIPU <- as.numeric(tg.getIntervalEndTime(tg, "IPU", p))
             if(turnOnset <= startIPU){
               if(turnOffset >= endIPU){
                 ipuCount <- ipuCount + 1
+                f <- data.frame(matrix(nrow=0, ncol=1))
+                names(f) <- c("f0")
                 for(l in 1:nrow(txt)){
                   if(txt$onset[l] >= startIPU){ # doing two separate if() statements because there's some confusion with the use of &(&)
                     if(txt$offset[l] <= endIPU){
                       if(!is.na(txt$f0mean[l])){
-                        timeIndexOverallRobot <- timeIndexOverallRobot + 1
-                        timeIndexInTurnRobot <- timeIndexInTurnRobot + 1
-                        f0[nrow(f0)+1,] <- c(substr(files$filesTG[i], 1, 9),
-                                             paste0(substr(files$filesTG[i], 7, 9), "-Robot"),
-                                             turnCountRobot,
-                                             turnOnset,
-                                             turnOffset,
-                                             as.numeric(turnOffset - turnOnset), # duration of turn
-                                             ipuCount,
-                                             startIPU,
-                                             endIPU,
-                                             as.numeric(endIPU - startIPU), # duration of IPU
-                                             timeIndexOverallRobot,
-                                             timeIndexInTurnRobot,
-                                             as.numeric(txt$f0mean[l]))
+                        f[nrow(f)+1,] <- as.numeric(txt$f0mean[l])
                       }
                     }
                   }
                 }
+                f0[nrow(f0)+1,] <- c(substr(files$filesTG[i], 1, 9),
+                                     paste0(substr(files$filesTG[i], 7, 9), "-Robot"),
+                                     turnCountRobot,
+                                     turnOnset,
+                                     turnOffset,
+                                     as.numeric(turnOffset - turnOnset), # duration of turn
+                                     ipuCount,
+                                     startIPU,
+                                     endIPU,
+                                     as.numeric(endIPU - startIPU), # duration of IPU
+                                     mean(f$f0))
               }
             }
           }
