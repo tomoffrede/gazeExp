@@ -191,7 +191,8 @@ load(paste0(folder, "f0.RData"))
 dat <- f0 %>% 
   mutate(participant = substr(file, 7, 9), # variable with name of speaker including for the robot subsets
          groupings = paste(speaker, condition, task, sep = "."),
-         tgroup = paste(groupings, turn, sep="."))
+         tgroup = paste(groupings, turn, sep=".")) %>% 
+  mutate_at(c("IPUOnset", "IPUOffset", "IPUDur", "turnOnset", "turnOffset", "turnDur"), as.numeric)
 
 intCO <- read.csv(paste0(folder, "intensityCO.csv"), sep="\t") %>% 
   filter(segment=="") %>% 
@@ -202,7 +203,69 @@ intBL <- read.csv(paste0(folder, "intensityBL.csv"), sep="\t") %>%
   select(File, start_segment, end_segment, dur_segment, intensity) %>% 
   rename(file=File)
 
+int <- data.frame(matrix(nrow=0, ncol=9))
+names(int) <- c("file", "speaker", "turn", "IPU", "onsetIPU", "offsetIPU", "onsetInt", "offsetInt", "intensity")
 
+startTime <- Sys.time()
+
+for(d in 1:nrow(dat)){
+  for(i in 1:nrow(intCO)){
+    if(dat$file[d] == intCO$file[i]){
+      if(intCO$start_segment[i] >= dat$IPUOnset[d]){
+        if(intCO$end_segment[i] <= dat$IPUOffset[d]){
+          int[nrow(int)+1,] <- c(dat$file[d],
+                                 dat$speaker[d],
+                                 dat$turn[d],
+                                 dat$IPU[d],
+                                 as.numeric(dat$IPUOnset[d]),
+                                 as.numeric(dat$IPUOffset[d]),
+                                 as.numeric(intCO$start_segment[i]),
+                                 as.numeric(intCO$end_segment[i]),
+                                 as.numeric(intCO$intensity[i]))
+        }
+      }
+    }
+  }
+}
+
+for(d in 1:nrow(dat)){
+  for(i in 1:nrow(intBL)){
+    if(dat$file[d] == intBL$file[i]){
+      if(intBL$start_segment[i] >= dat$IPUOnset[d]){
+        if(intBL$end_segment[i] <= dat$IPUOffset[d]){
+          int[nrow(int)+1,] <- c(dat$file[d],
+                                 dat$speaker[d],
+                                 dat$turn[d],
+                                 dat$IPU[d],
+                                 as.numeric(dat$IPUOnset[d]),
+                                 as.numeric(dat$IPUOffset[d]),
+                                 as.numeric(intBL$start_segment[i]),
+                                 as.numeric(intBL$end_segment[i]),
+                                 as.numeric(intBL$intensity[i]))
+        }
+      }
+    }
+  }
+}
+
+intsave <- int
+# int <- intsave
+
+int <- int %>% 
+  mutate_at(c("onsetIPU", "offsetIPU", "onsetInt", "offsetInt", "intensity"), as.numeric) %>% 
+  mutate_at(c("IPU"), as.integer) %>%
+  group_by(file, speaker, turn, IPU) %>% 
+  mutate(intensMean = mean(intensity, na.rm=TRUE)) %>% 
+  ungroup() %>% 
+  select(-c("onsetIPU", "offsetIPU", "onsetInt", "offsetInt", "intensity"))
+
+endTime <- Sys.time()
+endTime-startTime
+
+datsave <- dat
+# dat <- datsave
+
+dat <- full_join(dat, int, by=c("file", "speaker", "turn", "IPU"))
 
 {
 # datp <- dat
@@ -258,7 +321,7 @@ intBL <- read.csv(paste0(folder, "intensityBL.csv"), sep="\t") %>%
   }
 
 # for each turn of the human, save `robPrevf0`, i.e. the f0 of the robot's previous turn
-# for the first timeInfex of the human, robPrevf0 is the f0 of the robot's first timeIndex in the previous turn. human's second timeIndex is robot's second timeIndex u.s.w
+# for the first IPU of the human, robPrevf0 is the f0 of the robot's first IPU in the previous turn. human's second IPU is robot's second IPU u.s.w
 
 # datsave <- dat
 # dat <- datsave
@@ -304,6 +367,23 @@ dam <- merge(dat, m, by="participant")
 # for the baseline, robPrevf0 is the average of all the first robot's turns (robPrevf0 in `baseline` only exists for the second baseline)
 # also calculate gapDur, i.e. the gap (in seconds) between the interlocutor's previous turn and speaker's current turn
 
+# for baseline, do a different dataset and create column `overallIPUs`, which are all the IPUs of the robot without dividing them by turn. this will serve for the `robPrevf0` of the baseline
+
+b <- data.frame(matrix(nrow=0, ncol=5))
+names(b) <- c("speaker", "IPU", "f0mean", "condition", "overallIPU")
+
+for(s in unique(dat$speaker[grepl("Robot", dat$speaker)])){
+  for(c in unique(dat$condition)){
+    b0 <- dat %>% 
+      filter(speaker == s, 
+             condition == c) %>%
+      select(c(speaker, IPU, f0mean, condition)) %>% 
+      mutate_at("IPU", as.numeric) %>%
+      mutate(overallIPU = 1:n())
+    b <- rbind(b, b0)
+  }
+}
+
 # t <- dam %>%
 #   filter(grepl("Robot", speaker)) %>%
 #   group_by(speaker, condition) %>% 
@@ -331,11 +411,11 @@ for(i in 1:nrow(dac)){ # getting `robPrevf0` for the Conversation dataset
       previousf0 <- dac$f0mean[dac$speaker == dac$interlocutor[i] &
                                  dac$turn == dac$turn[i] &
                                  dac$condition == dac$condition[i] &
-                                 dac$timeIndexInTurn == dac$timeIndexInTurn[i]]
+                                 dac$IPU == dac$IPU[i]]
       previousf0Mock <- dac$f0mean[dac$speaker == dac$interlocutor[i] &
                                  dac$turn == dac$turn[i] &
                                  dac$condition != dac$condition[i] & # here use the other condition
-                                 dac$timeIndexInTurn == dac$timeIndexInTurn[i]]
+                                 dac$IPU == dac$IPU[i]]
       if(!purrr::is_empty(previousf0)){
         dac$robPrevf0[i] <- previousf0
       }
@@ -357,7 +437,7 @@ for(i in 1:nrow(dac)){ # getting `robPrevf0` for the Conversation dataset
 for(i in 1:nrow(dab)){
   previousf0 <- dac$f0mean[dac$speaker == dab$interlocutor[i] &
                              dac$condition == dab$prevCond[i] &
-                             dac$timeIndexOverall == dab$timeIndexOverall[i]]
+                             dac$overallIPU == dab$overallIPU[i]]
   if(!purrr::is_empty(previousf0)){
     if(!any(is.na(previousf0))){
       dab$robPrevf0[i] <- previousf0
@@ -366,7 +446,7 @@ for(i in 1:nrow(dab)){
   if(dab$condition[i] == substr(dab$Order[i], 1, 2)){
     previousf0Mock <- as.numeric(dac$f0mean[dac$speaker == dab$interlocutor[i] &
                                               dac$condition == dab$condition[i] &
-                                              dac$timeIndexOverall == dab$timeIndexOverall[i]])
+                                              dac$overallIPU == dab$overallIPU[i]])
     if(!purrr::is_empty(previousf0Mock)){
       if(!any(is.na(previousf0Mock))){
         dab$robPrevf0Mock[i] <- previousf0Mock
