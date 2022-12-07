@@ -25,19 +25,24 @@ files <- list.files(folder, "RData")
 fileBase <- files[grepl("Baseline", files)]
 fileConv <- files[grepl("Conversation", files) & !grepl("Including", files)]
 
-load(paste0(folder, fileBase))
-load(paste0(folder, fileConv))
+load(paste0(folder, "dataBaseline.RData"))
+load(paste0(folder, "dataConversation.RData"))
 
 dac <- dac[!grepl("Impairment|Dyslexia|Gender|Education|Age", names(dac))]
 
 dac <- dac %>%
-  mutate_at(c("turnDur", "turn", "f0mean", "robPrevf0", "gapDur", "intimMean", "intimSD", "intimMed", "IPUDur"), as.numeric) %>%
+  mutate_at(c("turnDur", "turn", "f0mean", "f0sd", "intensMean", "intensMax", "robPrevf0mean", "robPrevf0meanMock", "gapDur", "intimMean", "intimSD", "intimMed", "IPUDur", "robPrevf0sd", "robPrevf0sdMock", "robPrevIntMean", "robPrevIntMeanMock", "robPrevIntMax", "robPrevIntMaxMock"), as.numeric) %>%
   mutate_at(c("speaker", "condition", "Order", "task"), as.factor) %>% 
   group_by(speaker) %>%
   mutate(turnDurNormal = (turnDur - min(turnDur, na.rm = TRUE)) / (max(turnDur, na.rm = TRUE) - min(turnDur, na.rm = TRUE)),
          turnDurc = turnDur - mean(turnDur, na.rm=TRUE),
-         robf0c = robPrevf0 - mean(robPrevf0, na.rm=TRUE),
-         intimc = intimMean - mean(intimMean, na.rm=TRUE)) %>%
+         robf0meanc = robPrevf0mean - mean(robPrevf0mean, na.rm=TRUE),
+         robf0sdc = robPrevf0sd - mean(robPrevf0sd, na.rm=TRUE),
+         robIntMeanc = robPrevIntMean - mean(robPrevIntMean, na.rm=TRUE),
+         robIntMaxc = robPrevIntMax - mean(robPrevIntMax, na.rm=TRUE),
+         intimc = intimMean - mean(intimMean, na.rm=TRUE),
+         intensMeanC = intensMean - mean(intensMean, na.rm=TRUE),
+         intensMaxC = intensMax - mean(intensMax, na.rm=TRUE)) %>%
   ungroup() %>% 
   mutate(ESc = EmotionalStability - mean(EmotionalStability, na.rm=TRUE),
          Agreec = Agreeableness - mean(Agreeableness, na.rm=TRUE),
@@ -45,7 +50,8 @@ dac <- dac %>%
          Extrac = Extraversion - mean(Extraversion, na.rm=TRUE),
          IOc = IntellectOpenness - mean(IntellectOpenness, na.rm=TRUE),
          ConvQualc = PCConvQuality - mean(PCConvQuality, na.rm=TRUE),
-         RobQualc = PCRobotQuality - mean(PCRobotQuality, na.=TRUE)) # %>% 
+         RobQualc = PCRobotQuality - mean(PCRobotQuality, na.=TRUE),
+         IPUDurC = IPUDur - mean(IPUDur, na.rm=TRUE)) # %>% 
   # filter(scoreEN > 60) # see with and without low-level participants
 
 
@@ -143,28 +149,45 @@ anova(t1, t2)
 
 ## Using the f0 from the IPUs of the robot's previous turn as predictors for the f0 of the IPUs of the human's current turn
 
+### f0 mean
+
 ```{r}
-ggplot(dac, aes(robf0c, f0mean))+
+ggplot(dac, aes(robf0meanc, f0mean))+
   geom_point()+
   facet_wrap(~condition)+
   geom_smooth(method="lm")
 ```
 
-There is an effect of `robot's f0` in interaction with `condition`.
-
-* `condition : robot's f0`: the robot's f0 predicts the human's f0 only in the staring condition. 
 
 See:
 
 ```{r}
 dac$condition <- relevel(dac$condition, ref="NG")
 
-summary(f1 <- lmer(f0mean ~ robf0c : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
+summary(f1 <- lmer(f0mean ~ robf0meanc : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
 
-dac$IPUDurC <- dac$IPUDur - mean(dac$IPUDur, na.rm=TRUE)
+```
 
-summary(f2 <- lmer(f0mean ~ robf0c : condition + IPUDurC + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
-summary(f1 <- lmer(f0mean ~ robf0c : condition  + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
+### f0 SD
+
+```{r}
+dat <- dac %>% 
+  filter(abs(f0sd) < 30, abs(robf0sdc) < 30)
+
+ggplot(dat, aes(robf0sdc, f0sd))+
+  geom_point()+
+  facet_wrap(~condition)+
+  geom_smooth(method="lm")
+```
+
+
+```{r}
+dat <- dac %>% 
+  filter(abs(f0sd) < 30, abs(robf0sdc) < 30)
+
+summary(f1 <- lmer(f0sd ~ robf0sdc : condition + (1 + condition | speaker), dat %>% filter(!grepl("Robot", speaker))))
+summary(f2 <- lmer(f0sd ~ robf0sdc : condition : turnNormal + (1 + condition | speaker), dat %>% filter(!grepl("Robot", speaker))))
+anova(f1,f2)
 
 ```
 
@@ -178,13 +201,10 @@ ggplot(dac, aes(intimMean, f0mean))+
 ```
 
 
-* `intimacy`: f0 gets lower with higher intimacy.
-* But intimacy does not modulate the effect of robot's f0 on human's f0 (regardless of whether we include condition in the model.)
-
 ```{r}
 summary(f1 <- lmer(f0mean ~ intimc + (1 | speaker), dac %>% filter(!grepl("Robot", speaker))))
 
-summary(f2 <- lmer(f0mean ~ intimc : robf0c : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
+summary(f2 <- lmer(f0mean ~ intimc : robf0meanc : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
 
 par(mfrow=c(2,2))
 hist(resid(f1))
@@ -205,9 +225,9 @@ Maybe emotional stability (I think also called neuroticism) is the only potentia
 
 
 ```{r}
-summary(intel1 <- lmer(f0mean ~ robf0c : IOc : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
+summary(intel1 <- lmer(f0mean ~ robf0meanc : IOc : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
 
-summary(no1 <- lmer(f0mean ~ robf0c : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
+summary(no1 <- lmer(f0mean ~ robf0meanc : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
 anova(intel1, no1)
 ```
 
@@ -217,12 +237,12 @@ anova(intel1, no1)
 ```{r}
 d <- dac %>%
   filter(!grepl("Robot", speaker)) %>% 
-  select(f0mean, robf0c, Agreec, Agreeableness, condition, speaker) %>% 
+  select(f0mean, robf0meanc, Agreec, Agreeableness, condition, speaker) %>% 
   na.omit()
 
-summary(agree1 <- lmer(f0mean ~ robf0c : Agreec : condition + (1 +condition| speaker), d))
+summary(agree1 <- lmer(f0mean ~ robf0meanc : Agreec : condition + (1 +condition| speaker), d))
 
-summary(no1 <- lmer(f0mean ~ robf0c : condition + (1+condition | speaker), d))
+summary(no1 <- lmer(f0mean ~ robf0meanc : condition + (1+condition | speaker), d))
 anova(agree1, no1)
 ```
 #### Conscientiousness
@@ -231,12 +251,12 @@ anova(agree1, no1)
 ```{r}
 d <- dac %>%
   filter(!grepl("Robot", speaker)) %>% 
-  select(f0mean, robf0c, Conscc, condition, speaker) %>% 
+  select(f0mean, robf0meanc, Conscc, condition, speaker) %>% 
   na.omit()
 
-summary(con1 <- lmer(f0mean ~ robf0c : Conscc : condition + (1 + condition | speaker), d))
+summary(con1 <- lmer(f0mean ~ robf0meanc : Conscc : condition + (1 + condition | speaker), d))
 
-summary(no1 <- lmer(f0mean ~ robf0c : condition + (1 + condition | speaker), d))
+summary(no1 <- lmer(f0mean ~ robf0meanc : condition + (1 + condition | speaker), d))
 anova(con1, no1)
 ```
 
@@ -247,12 +267,12 @@ anova(con1, no1)
 ```{r}
 d <- dac %>%
   filter(!grepl("Robot", speaker)) %>% 
-  select(f0mean, robf0c, robPrevf0, ESc, EmotionalStability, condition, speaker, intimc) %>% 
+  select(f0mean, robf0meanc, robPrevf0mean, ESc, EmotionalStability, condition, speaker, intimc) %>% 
   na.omit()
 
-summary(em1c <- lmer(f0mean ~ robf0c : ESc : condition + (1 + condition | speaker), d))
+summary(em1c <- lmer(f0mean ~ robf0meanc : ESc : condition + (1 + condition | speaker), d))
 
-summary(no1 <- lmer(f0mean ~ robf0c : condition + (1 + condition | speaker), d))
+summary(no1 <- lmer(f0mean ~ robf0meanc : condition + (1 + condition | speaker), d))
 anova(em1c, no1)
 ```
 
@@ -260,9 +280,9 @@ anova(em1c, no1)
 
 
 ```{r}
-summary(ex1 <- lmer(f0mean ~ robf0c : Extrac : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
+summary(ex1 <- lmer(f0mean ~ robf0meanc : Extrac : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
 
-summary(no1 <- lmer(f0mean ~ robf0c : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
+summary(no1 <- lmer(f0mean ~ robf0meanc : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
 anova(ex1, no1)
 ```
 
@@ -297,9 +317,9 @@ These 2 dimensions were obtained through a PCA of the questionnaire ratings. I a
 AIC is slightly lower and t value higher. People that rated the conversation as better quality (see above) seemed to converge to the robot more.
 
 ```{r}
-summary(cf1 <- lmer(f0mean ~ robf0c : ConvQualc + (1 | speaker), dac %>% filter(!grepl("Robot", speaker))))
+summary(cf1 <- lmer(f0mean ~ robf0meanc : ConvQualc + (1 | speaker), dac %>% filter(!grepl("Robot", speaker))))
 
-summary(no1 <- lmer(f0mean ~ robf0c + (1 | speaker), dac %>% filter(!grepl("Robot", speaker))))
+summary(no1 <- lmer(f0mean ~ robf0meanc + (1 | speaker), dac %>% filter(!grepl("Robot", speaker))))
 anova(cf1, no1)
 ```
 
@@ -308,9 +328,9 @@ anova(cf1, no1)
 AIC is slightly lower and t value higher. So there seems to be a tendency for people to converge more to the robot they rated as higher quality.
 
 ```{r}
-summary(hl1 <- lmer(f0mean ~ robf0c : RobQualc + (1  | speaker), dac %>% filter(!grepl("Robot", speaker))))
+summary(hl1 <- lmer(f0mean ~ robf0meanc : RobQualc + (1  | speaker), dac %>% filter(!grepl("Robot", speaker))))
 
-summary(no1 <- lmer(f0mean ~ robf0c + (1 | speaker), dac %>% filter(!grepl("Robot", speaker))))
+summary(no1 <- lmer(f0mean ~ robf0meanc + (1 | speaker), dac %>% filter(!grepl("Robot", speaker))))
 anova(hl1, no1)
 ```
 
@@ -323,7 +343,7 @@ Here no effect shows up for `robot's MOCK f0`, so we can probably take the findi
 
 ```{r}
 dac$condition <- relevel(dac$condition, ref="GA")
-summary(f2 <- lmer(f0mean ~ intimMean + robPrevf0Mock : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
+summary(f2 <- lmer(f0mean ~ intimMean + robPrevf0meanMock : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
 ```
 
 
@@ -354,7 +374,7 @@ summary(ft1 <- lmer(f0Diff ~ condition * turnNormal + (1 + condition | speaker),
 # f0 during baseline
 
 ```{r}
-ggplot(dab, aes(robPrevf0, f0mean))+
+ggplot(dab, aes(robPrevf0mean, f0mean))+
   geom_point()+
   facet_wrap(~condition)+
   geom_smooth(method="loess")
@@ -364,13 +384,13 @@ There is no lasting convergence effect.
 
 ```{r}
 dab$condition <- relevel(dab$condition, ref="GA")
-summary(fb2 <- lmer(f0mean ~ robPrevf0 : condition + (1 | speaker), dab))
+summary(fb2 <- lmer(f0mean ~ robPrevf0mean : condition + (1 | speaker), dab))
 ```
 
 Similar result with robot's *mock* f0.
 
 ```{r}
-summary(fbM <- lmer(f0mean ~ robPrevf0Mock : condition + (1 | speaker), dab))
+summary(fbM <- lmer(f0mean ~ robPrevf0meanMock : condition + (1 | speaker), dab))
 ```
 
 
