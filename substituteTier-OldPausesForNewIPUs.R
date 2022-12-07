@@ -6,7 +6,7 @@ library(tidyverse)
 `%!in%` <- Negate(`%in%`)
 
 folder <- "C:/Users/offredet/Documents/1HU/ExperimentEyes/Data/All/"
-folderIPUs <- "C:/Users/offredet/Documents/1HU/ExperimentEyes/Data/IPU350/"
+folderIPUs <- "C:/Users/offredet/Documents/1HU/ExperimentEyes/Data/IPU150/"
 folderNew <- "C:/Users/offredet/Documents/1HU/ExperimentEyes/Data/NewTGs/"
 
 f <- list.files(folder, "TextGrid")
@@ -22,9 +22,7 @@ for(i in 1:nrow(files)){
   
   p <- tg.removeTier(p, "IPU")
   p <- tg.insertNewIntervalTier(p, newInd=Inf, "IPU", tMin=0, tMax=tg.getEndTime(t))
-  for(n in 1:(tg.getNumberOfIntervals(t, "IPU"))){ # there was a weird issue with the last interval,
-    # but since the last interval is usually gonna be outside of the last turn anyway (even for baseline),
-    # it's probably ok not to use the last annotated "IPU"
+  for(n in 1:(tg.getNumberOfIntervals(t, "IPU"))){
     p <- tg.insertInterval(p,
                            "IPU",
                            tStart=tg.getIntervalStartTime(t, "IPU", n),
