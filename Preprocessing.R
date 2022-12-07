@@ -28,7 +28,7 @@ files <- data.frame(cbind(filesTG, filesTXT))
 files <- files %>%
   mutate(worked = ifelse(substr(files$filesTG, 1, 9) == substr(files$filesTXT, 1, 9), "worked!", "NO!!!!"))
 
-f0 <- data.frame("file"=NA, "speaker"=NA, "turn"=NA, "turnOnset"=NA, "turnOffset"=NA, "turnDur"=NA, "IPU"=NA, "IPUOnset"=NA, "IPUOffset"=NA, "IPUDur"=NA, "f0mean"=NA) %>% 
+f0 <- data.frame("file"=NA, "speaker"=NA, "turn"=NA, "turnOnset"=NA, "turnOffset"=NA, "turnDur"=NA, "IPU"=NA, "IPUOnset"=NA, "IPUOffset"=NA, "IPUDur"=NA, "f0mean"=NA, "f0sd"=NA, "intensMean"=NA, "intensMax"=NA) %>% 
   filter(!is.na(file))
 
 # do something like the following, but also calculating f0 mean per IPU (not entire turn)
@@ -44,34 +44,40 @@ for(i in 1:nrow(files)){
     startBL <- as.numeric(tg.getIntervalStartTime(tg, "speech", as.numeric(tg.findLabels(tg, "speech", "baseline"))))
     endBL <- as.numeric(tg.getIntervalEndTime(tg, "speech", as.numeric(tg.findLabels(tg, "speech", "baseline"))))
     for(p in 1:tg.getNumberOfIntervals(tg, "IPU")){
-      if(tg.getLabel(tg, "IPU", p)=="IPU"){
+      if(tg.getLabel(tg, "IPU", p)!="pause"){
         startIPU <- as.numeric(tg.getIntervalStartTime(tg, "IPU", p))
         endIPU <- as.numeric(tg.getIntervalEndTime(tg, "IPU", p))
         if(startBL <= startIPU){ # doing two separate if() statements because there's some confusion with the use of &(&)
           if(endBL >= endIPU){
             ipuCount <- ipuCount + 1
-            f <- data.frame(matrix(nrow=0, ncol=1))
-            names(f) <- c("f0")
+            f <- data.frame(matrix(nrow=0, ncol=4))
+            names(f) <- c("f0mean", "f0sd", "intMean", "intMax")
             for(l in 1:nrow(txt)){
               if(txt$onset[l] >= startIPU){
                 if(txt$offset[l] <= endIPU){
-                  if(!is.na(txt$f0mean[l])){
-                    f[nrow(f)+1,] <- as.numeric(txt$f0mean[l])
-                  }
+                  f[nrow(f)+1,] <- c(as.numeric(txt$f0mean[l]),
+                                     as.numeric(txt$f0sd[l]),
+                                     as.numeric(txt$intensityMean[l]),
+                                     as.numeric(txt$intensityMax[l]))
                 }
               }
             }
-            f0[nrow(f0)+1,] <- c(substr(files$filesTG[i], 1, 9),
-                                 substr(files$filesTG[i], 7, 9),
-                                 "baseline", # "turn"
-                                 startBL,
-                                 endBL,
-                                 as.numeric(endBL - startBL), # duration of entire baseline
-                                 ipuCount,
-                                 startIPU,
-                                 endIPU,
-                                 as.numeric(endIPU - startIPU), # duration of IPU
-                                 mean(f$f0))
+            if(any(!is.na(f))){
+              f0[nrow(f0)+1,] <- c(substr(files$filesTG[i], 1, 9),
+                                   substr(files$filesTG[i], 7, 9),
+                                   "baseline", # "turn"
+                                   startBL,
+                                   endBL,
+                                   as.numeric(endBL - startBL), # duration of entire baseline
+                                   ipuCount,
+                                   startIPU,
+                                   endIPU,
+                                   as.numeric(endIPU - startIPU), # duration of IPU
+                                   mean(f$f0mean, na.rm=TRUE),
+                                   mean(f$f0sd, na.rm=TRUE),
+                                   mean(f$intMean, na.rm=TRUE),
+                                   max(f$intMax, na.rm=TRUE))
+            }
           }
         } 
       }
@@ -86,34 +92,42 @@ for(i in 1:nrow(files)){
         turnOnset <- as.numeric(tg.getIntervalStartTime(tg, "participant", n))
         turnOffset <- as.numeric(tg.getIntervalEndTime(tg, "participant", n))
         for(p in 1:tg.getNumberOfIntervals(tg, "IPU")){
-          if(tg.getLabel(tg, "IPU", p)=="IPU"){
+          if(tg.getLabel(tg, "IPU", p)!="pause"){
             startIPU <- as.numeric(tg.getIntervalStartTime(tg, "IPU", p))
             endIPU <- as.numeric(tg.getIntervalEndTime(tg, "IPU", p))
             if(turnOnset <= startIPU){ # doing two separate if() statements because there's some confusion with the use of &(&)
               if(turnOffset >= endIPU){
                 ipuCount <- ipuCount + 1
-                f <- data.frame(matrix(nrow=0, ncol=1))
-                names(f) <- c("f0")
+                f <- data.frame(matrix(nrow=0, ncol=4))
+                names(f) <- c("f0mean", "f0sd", "intMean", "intMax")
                 for(l in 1:nrow(txt)){
                   if(txt$onset[l] >= startIPU){
                     if(txt$offset[l] <= endIPU){
                       if(!is.na(txt$f0mean[l])){
-                        f[nrow(f)+1,] <- as.numeric(txt$f0mean[l])
+                        f[nrow(f)+1,] <- c(as.numeric(txt$f0mean[l]),
+                                           as.numeric(txt$f0sd[l]),
+                                           as.numeric(txt$intensityMean[l]),
+                                           as.numeric(txt$intensityMax[l]))
                       }
                     }
                   }
                 }
-                f0[nrow(f0)+1,] <- c(substr(files$filesTG[i], 1, 9),
-                                     substr(files$filesTG[i], 7, 9),
-                                     turnCountHuman,
-                                     turnOnset,
-                                     turnOffset,
-                                     as.numeric(turnOffset - turnOnset), # duration of turn
-                                     ipuCount,
-                                     startIPU,
-                                     endIPU,
-                                     as.numeric(endIPU - startIPU), # duration of IPU
-                                     mean(f$f0))
+                if(any(!is.na(f))){
+                  f0[nrow(f0)+1,] <- c(substr(files$filesTG[i], 1, 9),
+                                       substr(files$filesTG[i], 7, 9),
+                                       turnCountHuman,
+                                       turnOnset,
+                                       turnOffset,
+                                       as.numeric(turnOffset - turnOnset), # duration of turn
+                                       ipuCount,
+                                       startIPU,
+                                       endIPU,
+                                       as.numeric(endIPU - startIPU), # duration of IPU
+                                       mean(f$f0mean, na.rm=TRUE),
+                                       mean(f$f0sd, na.rm=TRUE),
+                                       mean(f$intMean, na.rm=TRUE),
+                                       max(f$intMax, na.rm=TRUE))
+                }
               }
             }
           }
@@ -127,34 +141,42 @@ for(i in 1:nrow(files)){
         turnOnset <- as.numeric(tg.getIntervalStartTime(tg, "robot", n))
         turnOffset <- as.numeric(tg.getIntervalEndTime(tg, "robot", n))
         for(p in 1:tg.getNumberOfIntervals(tg, "IPU")){
-          if(tg.getLabel(tg, "IPU", p)=="IPU"){
+          if(tg.getLabel(tg, "IPU", p)!="pause"){
             startIPU <- as.numeric(tg.getIntervalStartTime(tg, "IPU", p))
             endIPU <- as.numeric(tg.getIntervalEndTime(tg, "IPU", p))
             if(turnOnset <= startIPU){
               if(turnOffset >= endIPU){
                 ipuCount <- ipuCount + 1
-                f <- data.frame(matrix(nrow=0, ncol=1))
-                names(f) <- c("f0")
+                f <- data.frame(matrix(nrow=0, ncol=4))
+                names(f) <- c("f0mean", "f0sd", "intMean", "intMax")
                 for(l in 1:nrow(txt)){
                   if(txt$onset[l] >= startIPU){ # doing two separate if() statements because there's some confusion with the use of &(&)
                     if(txt$offset[l] <= endIPU){
                       if(!is.na(txt$f0mean[l])){
-                        f[nrow(f)+1,] <- as.numeric(txt$f0mean[l])
+                        f[nrow(f)+1,] <- c(as.numeric(txt$f0mean[l]),
+                                           as.numeric(txt$f0sd[l]),
+                                           as.numeric(txt$intensityMean[l]),
+                                           as.numeric(txt$intensityMax[l]))
                       }
                     }
                   }
                 }
-                f0[nrow(f0)+1,] <- c(substr(files$filesTG[i], 1, 9),
-                                     paste0(substr(files$filesTG[i], 7, 9), "-Robot"),
-                                     turnCountRobot,
-                                     turnOnset,
-                                     turnOffset,
-                                     as.numeric(turnOffset - turnOnset), # duration of turn
-                                     ipuCount,
-                                     startIPU,
-                                     endIPU,
-                                     as.numeric(endIPU - startIPU), # duration of IPU
-                                     mean(f$f0))
+                if(any(!is.na(f))){
+                  f0[nrow(f0)+1,] <- c(substr(files$filesTG[i], 1, 9),
+                                       paste0(substr(files$filesTG[i], 7, 9), "-Robot"),
+                                       turnCountRobot,
+                                       turnOnset,
+                                       turnOffset,
+                                       as.numeric(turnOffset - turnOnset), # duration of turn
+                                       ipuCount,
+                                       startIPU,
+                                       endIPU,
+                                       as.numeric(endIPU - startIPU), # duration of IPU
+                                       mean(f$f0mean, na.rm=TRUE),
+                                       mean(f$f0sd, na.rm=TRUE),
+                                       mean(f$intMean, na.rm=TRUE),
+                                       max(f$intMax, na.rm=TRUE))
+                }
               }
             }
           }
@@ -193,79 +215,6 @@ dat <- f0 %>%
          groupings = paste(speaker, condition, task, sep = "."),
          tgroup = paste(groupings, turn, sep=".")) %>% 
   mutate_at(c("IPUOnset", "IPUOffset", "IPUDur", "turnOnset", "turnOffset", "turnDur"), as.numeric)
-
-intCO <- read.csv(paste0(folder, "intensityCO.csv"), sep="\t") %>% 
-  filter(segment=="") %>% 
-  select(File, start_segment, end_segment, dur_segment, intensity) %>% 
-  rename(file=File)
-
-intBL <- read.csv(paste0(folder, "intensityBL.csv"), sep="\t") %>% 
-  select(File, start_segment, end_segment, dur_segment, intensity) %>% 
-  rename(file=File)
-
-int <- data.frame(matrix(nrow=0, ncol=9))
-names(int) <- c("file", "speaker", "turn", "IPU", "onsetIPU", "offsetIPU", "onsetInt", "offsetInt", "intensity")
-
-startTime <- Sys.time()
-
-for(d in 1:nrow(dat)){
-  for(i in 1:nrow(intCO)){
-    if(dat$file[d] == intCO$file[i]){
-      if(intCO$start_segment[i] >= dat$IPUOnset[d]){
-        if(intCO$end_segment[i] <= dat$IPUOffset[d]){
-          int[nrow(int)+1,] <- c(dat$file[d],
-                                 dat$speaker[d],
-                                 dat$turn[d],
-                                 dat$IPU[d],
-                                 as.numeric(dat$IPUOnset[d]),
-                                 as.numeric(dat$IPUOffset[d]),
-                                 as.numeric(intCO$start_segment[i]),
-                                 as.numeric(intCO$end_segment[i]),
-                                 as.numeric(intCO$intensity[i]))
-        }
-      }
-    }
-  }
-}
-
-for(d in 1:nrow(dat)){
-  for(i in 1:nrow(intBL)){
-    if(dat$file[d] == intBL$file[i]){
-      if(intBL$start_segment[i] >= dat$IPUOnset[d]){
-        if(intBL$end_segment[i] <= dat$IPUOffset[d]){
-          int[nrow(int)+1,] <- c(dat$file[d],
-                                 dat$speaker[d],
-                                 dat$turn[d],
-                                 dat$IPU[d],
-                                 as.numeric(dat$IPUOnset[d]),
-                                 as.numeric(dat$IPUOffset[d]),
-                                 as.numeric(intBL$start_segment[i]),
-                                 as.numeric(intBL$end_segment[i]),
-                                 as.numeric(intBL$intensity[i]))
-        }
-      }
-    }
-  }
-}
-
-intsave <- int
-# int <- intsave
-
-int <- int %>% 
-  mutate_at(c("onsetIPU", "offsetIPU", "onsetInt", "offsetInt", "intensity"), as.numeric) %>% 
-  mutate_at(c("IPU"), as.integer) %>%
-  group_by(file, speaker, turn, IPU) %>% 
-  mutate(intensMean = mean(intensity, na.rm=TRUE)) %>% 
-  ungroup() %>% 
-  select(-c("onsetIPU", "offsetIPU", "onsetInt", "offsetInt", "intensity"))
-
-endTime <- Sys.time()
-endTime-startTime
-
-datsave <- dat
-# dat <- datsave
-
-dat <- full_join(dat, int, by=c("file", "speaker", "turn", "IPU"))
 
 {
 # datp <- dat
@@ -346,8 +295,8 @@ dat <- merge(dat, dt, by="tgroup")
 # 
 dat <- dat %>%
   mutate(interlocutor = ifelse(nchar(speaker)==3, paste0(speaker, "-Robot"), substr(speaker, 1, 3)),
-         robPrevf0 = NA,
-         robPrevf0Mock = NA,
+         robPrevf0mean = NA,
+         robPrevf0meanMock = NA,
          gapDur = NA,
          f0Diff = NA)
 
@@ -395,9 +344,11 @@ dam <- dam %>%
   mutate(prevCond = ifelse(condition == prevCond, NA, prevCond))
 
 dab <- dam %>% filter(task == "Baseline") %>% # Baseline dataset
-  select(-c("turn", "gapDur", "f0Diff"))
+  select(-c("turn", "gapDur", "f0Diff")) %>% 
+  mutate_at(c("f0mean", "f0sd", "intensMean", "intensMax"), as.numeric)
 dac <- dam %>% filter(task == "Conversation") %>%  # Conversation dataset
-  mutate_at("turn", as.numeric) %>% 
+  mutate_at(c("turn", "f0mean", "f0sd", "intensMean", "intensMax"), as.numeric) %>% 
+  mutate("robPrevf0mean"=NA, "robPrevf0meanMock"=NA, "robPrevf0sd"=NA, "robPrevf0sdMock"=NA, "robPrevIntMean"=NA, "robPrevIntMeanMock"=NA, "robPrevIntMax"=NA, "robPrevIntMaxMock"=NA) %>% 
   group_by(speaker) %>% 
   mutate(turnNormal = (turn - min(turn)) / (max(turn) - min(turn))) %>% 
   ungroup()
@@ -408,21 +359,63 @@ dac <- dam %>% filter(task == "Conversation") %>%  # Conversation dataset
 for(i in 1:nrow(dac)){ # getting `robPrevf0` for the Conversation dataset
   if(nchar(dac$speaker[i]) == 3){ # if the speaker is human
     if(dac$task[i] == "Conversation"){ # if it's during the conversation (vs baseline)
-      previousf0 <- dac$f0mean[dac$speaker == dac$interlocutor[i] &
+      previousf0mean <- dac$f0mean[dac$speaker == dac$interlocutor[i] &
+                                     dac$turn == dac$turn[i] &
+                                     dac$condition == dac$condition[i] &
+                                     dac$IPU == dac$IPU[i]]
+      previousf0meanMock <- dac$f0mean[dac$speaker == dac$interlocutor[i] &
+                                         dac$turn == dac$turn[i] &
+                                         dac$condition != dac$condition[i] & # here use the other condition
+                                         dac$IPU == dac$IPU[i]]
+      previousf0sd <- dac$f0sd[dac$speaker == dac$interlocutor[i] &
                                  dac$turn == dac$turn[i] &
                                  dac$condition == dac$condition[i] &
                                  dac$IPU == dac$IPU[i]]
-      previousf0Mock <- dac$f0mean[dac$speaker == dac$interlocutor[i] &
-                                 dac$turn == dac$turn[i] &
-                                 dac$condition != dac$condition[i] & # here use the other condition
-                                 dac$IPU == dac$IPU[i]]
-      if(!purrr::is_empty(previousf0)){
-        dac$robPrevf0[i] <- previousf0
+      previousf0sdMock <- dac$f0sd[dac$speaker == dac$interlocutor[i] &
+                                     dac$turn == dac$turn[i] &
+                                     dac$condition != dac$condition[i] & # here use the other condition
+                                     dac$IPU == dac$IPU[i]]
+      previousIntMean <- dac$intensMean[dac$speaker == dac$interlocutor[i] &
+                                          dac$turn == dac$turn[i] &
+                                          dac$condition == dac$condition[i] &
+                                          dac$IPU == dac$IPU[i]]
+      previousIntMeanMock <- dac$intensMean[dac$speaker == dac$interlocutor[i] &
+                                              dac$turn == dac$turn[i] &
+                                              dac$condition != dac$condition[i] & # here use the other condition
+                                              dac$IPU == dac$IPU[i]]
+      previousIntMax <- dac$intensMax[dac$speaker == dac$interlocutor[i] &
+                                        dac$turn == dac$turn[i] &
+                                        dac$condition == dac$condition[i] &
+                                        dac$IPU == dac$IPU[i]]
+      previousIntMaxMock <- dac$intensMax[dac$speaker == dac$interlocutor[i] &
+                                            dac$turn == dac$turn[i] &
+                                            dac$condition != dac$condition[i] & # here use the other condition
+                                            dac$IPU == dac$IPU[i]]
+      if(!purrr::is_empty(previousf0mean)){
+        dac$robPrevf0mean[i] <- previousf0mean
       }
-      if(!purrr::is_empty(previousf0Mock)){
-        dac$robPrevf0Mock[i] <- previousf0Mock
+      if(!purrr::is_empty(previousf0meanMock)){
+        dac$robPrevf0meanMock[i] <- previousf0meanMock
       }
-      previousf0Turn <- as.numeric(unique(dac$f0turn[dac$speaker == dac$interlocutor[i] &
+      if(!purrr::is_empty(previousf0sd)){
+        dac$robPrevf0sd[i] <- previousf0sd
+      }
+      if(!purrr::is_empty(previousf0sdMock)){
+        dac$robPrevf0sdMock[i] <- previousf0sdMock
+      }
+      if(!purrr::is_empty(previousIntMean)){
+        dac$robPrevIntMean[i] <- previousIntMean
+      }
+      if(!purrr::is_empty(previousIntMeanMock)){
+        dac$robPrevIntMeanMock[i] <- previousIntMeanMock
+      }
+      if(!purrr::is_empty(previousIntMax)){
+        dac$robPrevIntMax[i] <- previousIntMax
+      }
+      if(!purrr::is_empty(previousIntMax)){
+        dac$robPrevIntMaxMock[i] <- previousIntMax
+      }
+      previousf0meanTurn <- as.numeric(unique(dac$f0turn[dac$speaker == dac$interlocutor[i] &
                                      dac$turn == dac$turn[i] &
                                      dac$condition == dac$condition[i]]))
       dac$f0Diff[i] <- abs(as.numeric(dac$f0turn[i]) - previousf0Turn)
@@ -435,27 +428,27 @@ for(i in 1:nrow(dac)){ # getting `robPrevf0` for the Conversation dataset
 }
 
 for(i in 1:nrow(dab)){
-  previousf0 <- dac$f0mean[dac$speaker == dab$interlocutor[i] &
-                             dac$condition == dab$prevCond[i] &
-                             dac$overallIPU == dab$overallIPU[i]]
+  previousf0mean <- b$f0mean[b$speaker == dab$interlocutor[i] &
+                             b$condition == dab$prevCond[i] &
+                             b$overallIPU == dab$overallIPU[i]]
   if(!purrr::is_empty(previousf0)){
-    if(!any(is.na(previousf0))){
-      dab$robPrevf0[i] <- previousf0
+    if(!any(is.na(previousf0mean))){
+      dab$robPrevf0mean[i] <- previousf0mean
     }
   }
   if(dab$condition[i] == substr(dab$Order[i], 1, 2)){
-    previousf0Mock <- as.numeric(dac$f0mean[dac$speaker == dab$interlocutor[i] &
-                                              dac$condition == dab$condition[i] &
-                                              dac$overallIPU == dab$overallIPU[i]])
+    previousf0meanMock <- as.numeric(b$f0mean[b$speaker == dab$interlocutor[i] &
+                                              b$condition == dab$condition[i] &
+                                              b$overallIPU == dab$overallIPU[i]])
     if(!purrr::is_empty(previousf0Mock)){
       if(!any(is.na(previousf0Mock))){
-        dab$robPrevf0Mock[i] <- previousf0Mock
+        dab$robPrevf0meanMock[i] <- previousf0meanMock
       }
     }
   }
 }
 
-# we don't need to calculate `robPrevf0` for the robot, because the robot's speech wasn't influenced by the human anyway
+# we don't need to calculate `robmeanPrevf0` for the robot, because the robot's speech wasn't influenced by the human anyway
 
 dL <- list(dab, dac)
 for(d in 1:length(dL)){
