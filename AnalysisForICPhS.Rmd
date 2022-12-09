@@ -1,0 +1,152 @@
+---
+title: "FinalModels-ICPhS"
+author: "Tom Offrede"
+date: "2022-12-09"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, include=FALSE}
+library(tidyverse)
+library(lme4)
+library(ggdist)
+
+`%!in%` <- Negate(`%in%`)
+
+folder <- "C:/Users/offredet/Documents/1HU/ExperimentEyes/Data/All/"
+files <- list.files(folder, "RData")
+fileBase <- files[grepl("Baseline", files)]
+fileConv <- files[grepl("Conversation", files) & !grepl("Including", files)]
+folderConvPlots <- "C:/Users/offredet/Documents/1HU/ExperimentEyes/Data/ConvergencePlots/"
+
+load(paste0(folder, "dataBaseline.RData"))
+load(paste0(folder, "dataConversation.RData"))
+
+dac <- dac[!grepl("Impairment|Dyslexia|Gender|Education|Age", names(dac))]
+
+dac <- dac %>%
+  filter(!grepl("Robot", speaker)) %>% 
+  mutate_at(c("turnDur", "turn", "f0mean", "f0sd", "intensMean", "intensMax", "robPrevf0mean", "robPrevf0meanMock", "gapDur", "intimMean", "intimSD", "intimMed", "IPUDur", "robPrevf0sd", "robPrevf0sdMock", "robPrevIntMean", "robPrevIntMeanMock", "robPrevIntMax", "robPrevIntMaxMock"), as.numeric) %>%
+  mutate_at(c("speaker", "condition", "Order", "task"), as.factor) %>% 
+  group_by(speaker) %>%
+  mutate(turnDurNormal = (turnDur - min(turnDur, na.rm = TRUE)) / (max(turnDur, na.rm = TRUE) - min(turnDur, na.rm = TRUE)),
+         turnDurc = turnDur - mean(turnDur, na.rm=TRUE),
+         robf0meanc = robPrevf0mean - mean(robPrevf0mean, na.rm=TRUE),
+         robf0sdc = robPrevf0sd - mean(robPrevf0sd, na.rm=TRUE),
+         robIntMeanc = robPrevIntMean - mean(robPrevIntMean, na.rm=TRUE),
+         robIntMaxc = robPrevIntMax - mean(robPrevIntMax, na.rm=TRUE),
+         intimc = intimMean - mean(intimMean, na.rm=TRUE),
+         intensMeanC = intensMean - mean(intensMean, na.rm=TRUE),
+         intensMaxC = intensMax - mean(intensMax, na.rm=TRUE),
+         f0CV = f0sd / f0mean,
+         robf0CV = robPrevf0sd / robPrevf0mean,
+         robf0CVc = robf0CV - mean(robf0CV, na.rm=TRUE),
+         mockf0meanC = robPrevf0meanMock - mean(robPrevf0meanMock, na.rm=TRUE),
+         mockf0sdC = robPrevf0sdMock - mean(robPrevf0sdMock, na.rm=TRUE),
+         mockf0CV = robPrevf0sdMock / robPrevf0meanMock,
+         mockf0CVc = mockf0CV - mean(mockf0CV, na.rm=TRUE),
+         f0sdZ = (f0sd - mean(f0sd, na.rm=TRUE))/sd(f0sd, na.rm=TRUE),
+         robf0sdZ = robf0sdc / sd(robPrevf0sd, na.rm=TRUE),
+         f0CVz = (f0CV - mean(f0CV, na.rm=TRUE))/sd(f0CV, na.rm=TRUE),
+         robf0CVz = robf0CVc / sd(robf0CV, na.rm=TRUE),
+         f0meanZ = (f0mean - mean(f0mean, na.rm=TRUE))/sd(f0mean, na.rm=TRUE),
+         robf0meanZ = robf0meanc / sd(robPrevf0mean, na.rm = TRUE)) %>%
+  ungroup() %>% 
+  mutate(ESc = EmotionalStability - mean(EmotionalStability, na.rm=TRUE),
+         Agreec = Agreeableness - mean(Agreeableness, na.rm=TRUE),
+         Conscc = Conscientiousness - mean(Conscientiousness, na.rm=TRUE),
+         Extrac = Extraversion - mean(Extraversion, na.rm=TRUE),
+         IOc = IntellectOpenness - mean(IntellectOpenness, na.rm=TRUE),
+         ConvQualc = PCConvQuality - mean(PCConvQuality, na.rm=TRUE),
+         RobQualc = PCRobotQuality - mean(PCRobotQuality, na.=TRUE),
+         IPUDurC = IPUDur - mean(IPUDur, na.rm=TRUE)) #%>% 
+  # filter(scoreEN > 60) # see with and without low-level participants
+
+
+dab <- dab %>%
+  mutate_at(c("condition"), as.factor)
+
+dat <- dac
+```
+
+
+### Intimacy
+
+#### f0 mean
+
+intimacy reduces f0 mean and robot (condition nor robot'S f0) doesnt affect this effect. Intensity is not affected by intimacy.
+
+```{r}
+summary(f1 <- lmer(f0mean ~ intimc + (1  | speaker), dat))
+
+summary(f1b <- lmer(f0mean ~ intimc : condition  + (1 | speaker), dat))
+anova(f1, f1b)
+
+par(mfrow=c(2,2))
+hist(resid(f1))
+qqnorm(resid(f1));qqline(resid(f1))
+plot(fitted(f1, resid(f1)))
+```
+
+#### f0 SD
+
+f0 SD reduces with higher intimacy. (people speak more monotonously)
+Residuals: largely skewed on the right
+
+```{r}
+summary(f1a <- lmer(f0sd ~ intimc  + (1  | speaker), dat))
+
+summary(f1b <- lmer(f0sd ~ intimc : condition + (1  | speaker), dat))
+anova(f1a, f1b)
+
+
+par(mfrow=c(2,2))
+hist(resid(f1a))
+qqnorm(resid(f1a));qqline(resid(f1a))
+plot(fitted(f1a, resid(f1a)))
+
+```
+
+### Robot's effect on convergence
+
+#### f0 sd
+
+```{r}
+summary(f1 <- lmer(f0sd ~ robf0sdc : condition + (1 + condition | speaker), dat))
+
+```
+
+
+```{r}
+dat <- dac %>%
+  group_by(speaker, condition) %>% 
+  mutate(IPUoverall = 1:n()) %>% 
+  ungroup() %>% 
+  select(speaker, turn, IPUoverall, f0mean, robPrevf0mean, condition)
+
+for(s in unique(dac$speaker)){
+  for(c in unique(dac$condition)){
+    if(c=="NG"){cond = "Fixed Gaze"}else{cond = "Gaze Aversion"}
+    d <- dat %>%
+      filter(speaker==s, condition==c)
+    dR <- d %>%
+      select(-f0mean) %>% 
+      rename(f0mean = robPrevf0mean) %>% 
+      mutate(speaker = "Robot")
+    d$robPrevf0mean <- NULL
+    d <- rbind(d, dR)
+    # png(paste0(folderConvPlots, c, "-", s, ".png"))
+    ggplot(d, aes(IPUoverall, f0mean, color=speaker))+
+      geom_point()+
+      geom_smooth(method="loess")+
+      ggtitle(paste0(s, " - ", cond))
+    ggsave(paste0(folderConvPlots, c, "-", s, ".png"))
+    # dev.off()
+  }
+}
+
+```
+
