@@ -218,7 +218,7 @@ dat <- dac %>%
   filter(abs(f0sdZ) < 2.5,
          abs(robf0sdZ) < 2.5)
 
-summary(f2 <- lmer(f0sd ~ robf0sdc : condition : turn + (1 + condition | speaker), dat))
+summary(f2 <- lmer(f0sd ~ robf0sdc : condition : turn : f0mean + (1 + condition | speaker), dat))
 
 par(mfrow=c(2,2))
 hist(resid(f2))
@@ -287,13 +287,18 @@ ggplot(dat, aes(intimMean, f0mean))+
   geom_smooth(method="lm")
 ```
 
+results from below: intimacy reduces f0 mean and robot (condition nor robot'S f0) doesnt affect this effect. Intensity is not affected by intimacy.
 
 ```{r}
-dat <- dac %>% 
-  filter(abs(f0meanZ) < 2.5,
-         abs(robf0meanZ) < 2.5)
+dat <- dac
 
-summary(f1 <- lmer(f0mean ~ intimc + intensMeanC  + (1 | speaker), dat))
+summary(f1a <- lmer(f0mean ~ intimc + (1  | speaker), dat))
+
+summary(f1b <- lmer(f0mean ~ intimc : condition  + (1 | speaker), dat))
+anova(f1a, f1b)
+
+
+summary(f1 <- lmer(intensMean ~ intimc   + (1  | speaker), dat))
 
 summary(f2 <- lmer(f0mean ~ intimc : robf0meanc : condition + intensMeanC + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
 
@@ -307,17 +312,26 @@ plot(fitted(f1, resid(f1)))
 #### f0 SD
 
 ```{r}
-dat <- dac %>% 
-  filter(abs(f0sdZ) < 2.5,
-         abs(robf0sdZ) < 2.5)
+dat <- dac
 
-summary(f1 <- lmer(f0sd ~ intimc + intensMeanC + (1 | speaker), dat))
+summary(f1 <- lmer(f0sd ~ intimc : condition + (1 + condition | speaker), dat))
+
+
+
+summary(f1 <- lmer(intensMean ~ intimc  + (1  | speaker), dat))
+
+summary(f1 <- lmer(f0sd ~ intimc : robf0sdc : condition + (1 + condition | speaker), dat))
 
 
 par(mfrow=c(2,2))
 hist(resid(f1))
 qqnorm(resid(f1));qqline(resid(f1))
 plot(fitted(f1, resid(f1)))
+
+##############
+
+
+summary(lmer(intensMean ~ robIntMeanc : condition : intimc + (1+condition|speaker), dac))
 ```
 
 
@@ -401,8 +415,12 @@ anova(con1, no1)
 ```{r}
 d <- dac %>%
   filter(!grepl("Robot", speaker)) %>% 
-  select(f0sd, robf0sdc, robPrevf0sd, ESc, EmotionalStability, condition, turnNormal, speaker, intimc) %>% 
+  select(f0sd, f0sdZ, robf0sdZ,  robf0sdc, robPrevf0sd, ESc, EmotionalStability, condition, turnNormal, speaker, intimc) %>% 
   na.omit()
+
+d <- d %>% 
+  filter(abs(f0sdZ) < 2.5,
+         abs(robf0sdZ)<2.5)
 
 summary(em0c <- lmer(f0sd ~ robf0sdc : ESc : turn + intensMeanC + (1 | speaker), dac))
 
@@ -419,10 +437,11 @@ summary(no1 <- lmer(f0sd ~ robf0sdc : condition : turnNormal + (1 + condition | 
 anova(em1c, no1)
 
 
-
-
 # with mock data
 summary(em0c <- lmer(f0sd ~ mockf0sdC : ESc : turn + intensMeanC + (1 | speaker), dac))
+
+
+
 ```
 
 #### Extraversion
