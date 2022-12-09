@@ -31,6 +31,7 @@ load(paste0(folder, "dataConversation.RData"))
 dac <- dac[!grepl("Impairment|Dyslexia|Gender|Education|Age", names(dac))]
 
 dac <- dac %>%
+  filter(!grepl("Robot", speaker)) %>% 
   mutate_at(c("turnDur", "turn", "f0mean", "f0sd", "intensMean", "intensMax", "robPrevf0mean", "robPrevf0meanMock", "gapDur", "intimMean", "intimSD", "intimMed", "IPUDur", "robPrevf0sd", "robPrevf0sdMock", "robPrevIntMean", "robPrevIntMeanMock", "robPrevIntMax", "robPrevIntMaxMock"), as.numeric) %>%
   mutate_at(c("speaker", "condition", "Order", "task"), as.factor) %>% 
   group_by(speaker) %>%
@@ -51,7 +52,11 @@ dac <- dac %>%
          mockf0CV = robPrevf0sdMock / robPrevf0meanMock,
          mockf0CVc = mockf0CV - mean(mockf0CV, na.rm=TRUE),
          f0sdZ = (f0sd - mean(f0sd, na.rm=TRUE))/sd(f0sd, na.rm=TRUE),
-         robf0sdZ = robf0sdc / sd(robPrevf0sd, na.rm=TRUE)) %>%
+         robf0sdZ = robf0sdc / sd(robPrevf0sd, na.rm=TRUE),
+         f0CVz = (f0CV - mean(f0CV, na.rm=TRUE))/sd(f0CV, na.rm=TRUE),
+         robf0CVz = robf0CVc / sd(robf0CV, na.rm=TRUE),
+         f0meanZ = (f0mean - mean(f0mean, na.rm=TRUE))/sd(f0mean, na.rm=TRUE),
+         robf0meanZ = robf0meanc / sd(robPrevf0mean, na.rm = TRUE)) %>%
   ungroup() %>% 
   mutate(ESc = EmotionalStability - mean(EmotionalStability, na.rm=TRUE),
          Agreec = Agreeableness - mean(Agreeableness, na.rm=TRUE),
@@ -60,10 +65,7 @@ dac <- dac %>%
          IOc = IntellectOpenness - mean(IntellectOpenness, na.rm=TRUE),
          ConvQualc = PCConvQuality - mean(PCConvQuality, na.rm=TRUE),
          RobQualc = PCRobotQuality - mean(PCRobotQuality, na.=TRUE),
-         IPUDurC = IPUDur - mean(IPUDur, na.rm=TRUE)) %>% 
-  filter(abs(f0sdZ) < 2.5#,
-         #abs(robf0sdZ) < 2.5
-         )
+         IPUDurC = IPUDur - mean(IPUDur, na.rm=TRUE)) #%>% 
   # filter(scoreEN > 60) # see with and without low-level participants
 
 
@@ -164,7 +166,11 @@ anova(t1, t2)
 ### f0 mean
 
 ```{r}
-ggplot(dac, aes(robf0meanc, f0mean))+
+dat <- dac %>% 
+  filter(abs(f0meanZ) < 2.5,
+         abs(robf0meanZ) < 2.5)
+
+ggplot(dat, aes(robf0meanc, f0mean))+
   geom_point()+
   facet_wrap(~condition)+
   geom_smooth(method="lm")
@@ -174,26 +180,45 @@ ggplot(dac, aes(robf0meanc, f0mean))+
 See:
 
 ```{r}
+dat <- dac %>% 
+  filter(abs(f0meanZ) < 2.5,
+         abs(robf0meanZ) < 2.5)
+
 dac$condition <- relevel(dac$condition, ref="NG")
 
-summary(f1 <- lmer(f0mean ~ robf0meanc : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
+summary(f1 <- lmer(f0mean ~ robf0meanc : condition : turn + (1 + condition | speaker), dat))
 
 ```
 
 ### f0 SD
 
 ```{r}
-ggplot(dac, aes(robf0sdc, f0sd))+
+dat <- dac %>% 
+  filter(abs(f0sdZ) < 2.5,
+         abs(robf0sdZ) < 2.5)
+
+ggplot(dat %>% filter(condition=="NG"), aes(robf0sdc, f0sd))+
   geom_point()+
-  facet_wrap(~condition)+
-  geom_smooth(method="lm")
+  facet_wrap(~as.factor(turn))+
+  geom_smooth(method="lm")+
+  ggtitle("Fixed Gaze")
+
+ggplot(dat %>% filter(condition=="GA"), aes(robf0sdc, f0sd))+
+  geom_point()+
+  facet_wrap(~as.factor(turn))+
+  geom_smooth(method="lm")+
+  ggtitle("Gaze Aversion")
 ```
 
 
 * People seem to diverge on F0 SD from the robot that does GA.
 
 ```{r}
-summary(f2 <- lmer(f0sd ~ robf0sdc : condition : turnNormal + (1 + condition | speaker) , dac %>% filter(!grepl("Robot", speaker))))
+dat <- dac %>% 
+  filter(abs(f0sdZ) < 2.5,
+         abs(robf0sdZ) < 2.5)
+
+summary(f2 <- lmer(f0sd ~ robf0sdc : condition : turn + (1 + condition | speaker), dat))
 
 par(mfrow=c(2,2))
 hist(resid(f2))
@@ -215,7 +240,11 @@ anova(f1,f2)
 ### f0 coefficient of variation
 
 ```{r}
-ggplot(dac, aes(robf0CVc, f0CV))+
+dat <- dac %>% 
+  filter(abs(f0CVz) < 2.5,
+         abs(robf0CVz) < 2.5)
+
+ggplot(dat, aes(robf0CVc, f0CV))+
   geom_point()+
   facet_wrap(~condition)+
   geom_smooth(method="lm")
@@ -224,8 +253,12 @@ ggplot(dac, aes(robf0CVc, f0CV))+
 * Like for f0 SD, the coefficient of variation follows the same pattern.
 
 ```{r}
-summary(f1 <- lmer(f0CV ~ robf0CVc : condition + (1 + condition | speaker), dat %>% filter(!grepl("Robot", speaker))))
-summary(f2 <- lmer(f0CV ~ robf0CVc : condition : turnNormal + (1 + condition | speaker), dat %>% filter(!grepl("Robot", speaker))))
+dat <- dac %>% 
+  filter(abs(f0CVz) < 2.5,
+         abs(robf0CVz) < 2.5)
+
+summary(f1 <- lmer(f0CV ~ robf0CVc : condition + (1 + condition | speaker), dat))
+summary(f2 <- lmer(f0CV ~ robf0CVc : condition : turn + (1 + condition | speaker), dat))
 anova(f1,f2)
 
 ```
@@ -244,7 +277,11 @@ summary(f1 <- lmer(f0sd ~ mockf0CVc : condition + (1 + condition | speaker), dac
 #### f0 mean
 
 ```{r}
-ggplot(dac, aes(intimMean, f0mean))+
+dat <- dac %>% 
+  filter(abs(f0meanZ) < 2.5,
+         abs(robf0meanZ) < 2.5)
+
+ggplot(dat, aes(intimMean, f0mean))+
   geom_point()+
   facet_wrap(~condition)+
   geom_smooth(method="lm")
@@ -252,9 +289,13 @@ ggplot(dac, aes(intimMean, f0mean))+
 
 
 ```{r}
-summary(f1 <- lmer(f0mean ~ intimc + intensMeanC + (1 | speaker), dac %>% filter(!grepl("Robot", speaker))))
+dat <- dac %>% 
+  filter(abs(f0meanZ) < 2.5,
+         abs(robf0meanZ) < 2.5)
 
-summary(f2 <- lmer(f0mean ~ intimc : robf0meanc : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
+summary(f1 <- lmer(f0mean ~ intimc + intensMeanC  + (1 | speaker), dat))
+
+summary(f2 <- lmer(f0mean ~ intimc : robf0meanc : condition + intensMeanC + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
 
 par(mfrow=c(2,2))
 hist(resid(f1))
@@ -266,7 +307,11 @@ plot(fitted(f1, resid(f1)))
 #### f0 SD
 
 ```{r}
-summary(f1 <- lmer(f0sd ~ intimc + intensMeanC + (1 | speaker), dac %>% filter(!grepl("Robot", speaker))))
+dat <- dac %>% 
+  filter(abs(f0sdZ) < 2.5,
+         abs(robf0sdZ) < 2.5)
+
+summary(f1 <- lmer(f0sd ~ intimc + intensMeanC + (1 | speaker), dat))
 
 
 par(mfrow=c(2,2))
@@ -274,6 +319,30 @@ hist(resid(f1))
 qqnorm(resid(f1));qqline(resid(f1))
 plot(fitted(f1, resid(f1)))
 ```
+
+
+#### f0 CV
+
+```{r}
+dat <- dac %>% 
+  filter(abs(f0CVz) < 2.5,
+         abs(robf0CVz) < 2.5)
+
+summary(f1 <- lmer(f0CV ~ intimc + intensMeanC + (1 | speaker), dat))
+
+
+par(mfrow=c(2,2))
+hist(resid(f1))
+qqnorm(resid(f1));qqline(resid(f1))
+plot(fitted(f1, resid(f1)))
+```
+
+### Compare f0 at beginning and end of conversation
+
+```{r}
+
+```
+
 
 ### BFI
 
@@ -335,17 +404,32 @@ d <- dac %>%
   select(f0sd, robf0sdc, robPrevf0sd, ESc, EmotionalStability, condition, turnNormal, speaker, intimc) %>% 
   na.omit()
 
-summary(em1c <- lmer(f0sd ~ robf0sdc : ESc : condition : turnNormal + (1 + condition | speaker), dac))
+summary(em0c <- lmer(f0sd ~ robf0sdc : ESc : turn + intensMeanC + (1 | speaker), dac))
+
+summary(em1c <- lmer(f0sd ~ robf0sdc : ESc  : condition : turn + intensMeanC + (1+condition | speaker), dac))
+
+anova(em0c, em1c)
+
+
+summary(em2c <- lmer(f0sd ~ robf0sdc : ESc  : turn + intensMeanC + (1  | speaker), dac))
+
+anova(em2c, em1c)
 
 summary(no1 <- lmer(f0sd ~ robf0sdc : condition : turnNormal + (1 + condition | speaker), d))
 anova(em1c, no1)
+
+
+
+
+# with mock data
+summary(em0c <- lmer(f0sd ~ mockf0sdC : ESc : turn + intensMeanC + (1 | speaker), dac))
 ```
 
 #### Extraversion
 
 
 ```{r}
-summary(ex1 <- lmer(f0sd ~ robf0sdc : Extrac : condition :turnNormal+ (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
+summary(ex1 <- lmer(f0sd ~ robf0sdc : Extrac : condition :turn+ (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
 
 summary(no1 <- lmer(f0sd ~ robf0sdc : condition : turnNormal+ (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
 anova(ex1, no1)
