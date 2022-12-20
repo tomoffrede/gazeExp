@@ -13,6 +13,8 @@ knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(lme4)
 library(ggdist)
+library(viridis)
+library(ggpubr)
 
 `%!in%` <- Negate(`%in%`)
 
@@ -110,15 +112,30 @@ plot(fitted(f1a, resid(f1a)))
 
 ```
 
+#### Intensity
+
+```{r}
+summary(lmer(intensMean ~ intimc + (1 | speaker), dat))
+summary(lmer(intensMean ~ intimc : condition + (1 + condition | speaker), dat))
+```
+
+
 ### Robot's effect on convergence
+
+#### f0 mean
+
+```{r}
+summary(f1 <- lmer(f0mean ~ robf0meanc : condition : turn + (1 + condition | speaker), dat))
+```
 
 #### f0 sd
 
 ```{r}
-summary(f1 <- lmer(f0sd ~ robf0sdc : condition + (1 + condition | speaker), dat))
+summary(f1 <- lmer(f0sd ~ robf0sdc : condition : turn + (1 + condition | speaker), dat))
 
 ```
 
+#### f0 mean plots
 
 ```{r}
 dat <- dac %>%
@@ -148,5 +165,74 @@ for(s in unique(dac$speaker)){
   }
 }
 
-```
+# for paper: NG-MDE (convergence/synchrony), GA-FQD (divergence), NG-JBY (conv then div)
 
+for(s in c("MDE", "JBY", "FQD")){
+  if(s!="FQD"){
+    d <- dat %>%
+      filter(speaker==s, condition=="NG")
+  }
+  if(s=="FQD"){
+    d <- dat %>%
+      filter(speaker==s, condition=="GA")
+  }
+    dR <- d %>%
+      select(-f0mean) %>% 
+      rename(f0mean = robPrevf0mean) %>% 
+      mutate(speaker = "Robot")
+    d$robPrevf0mean <- NULL
+    d <- rbind(d, dR)
+    if(s=="MDE"){
+      m <- ggplot(d, aes(IPUoverall, f0mean, color=speaker))+
+        theme_classic()+
+        geom_point()+
+        geom_smooth(method="loess")+
+        scale_color_viridis_d(end=0.6, labels=c("Human", "Robot"))+
+        labs(title="A",
+             color="Speaker",
+             y="F0 mean",
+             x="Time")+
+        theme(axis.text.x=element_blank(),
+              axis.ticks.y = element_blank(),
+              axis.ticks.x = element_blank())+
+        ylim(100,200)
+    }
+    if(s=="JBY"){
+      j <- ggplot(d, aes(IPUoverall, f0mean, color=speaker))+
+        theme_classic()+
+        geom_point()+
+        geom_smooth(method="loess")+
+        scale_color_viridis_d(end=0.6, labels=c("Human", "Robot"))+
+        labs(title="C",
+             color="Speaker",
+             y="F0 mean",
+             x="Time")+
+        theme(axis.text.x=element_blank(),
+              axis.ticks.y = element_blank(),
+              axis.ticks.x = element_blank())+
+        ylim(100,200)
+    }
+    if(s=="FQD"){
+      f <- ggplot(d, aes(IPUoverall, f0mean, color=speaker))+
+        theme_classic()+
+        geom_point()+
+        geom_smooth(method="loess")+
+        scale_color_viridis_d(end=0.6, labels=c("Human", "Robot"))+
+        labs(title="B",
+             color="Speaker",
+             y="F0 mean",
+             x="Time")+
+        theme(axis.text.x=element_blank(),
+              axis.ticks.y = element_blank(),
+              axis.ticks.x = element_blank())+
+        ylim(100,200)
+    }
+  }
+}
+
+arr <- ggarrange(m, f, j, ncol=1)
+fig <- annotate_figure(arr, top = text_grob("Examples of F0 mean patterns", size=16))
+
+ggsave(paste0(folder, "icphs.png"), plot=fig, height=2000, width=1500, units = "px")
+
+```
