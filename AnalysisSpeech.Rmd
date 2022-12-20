@@ -64,13 +64,19 @@ dac <- dac %>%
          Extrac = Extraversion - mean(Extraversion, na.rm=TRUE),
          IOc = IntellectOpenness - mean(IntellectOpenness, na.rm=TRUE),
          ConvQualc = PCConvQuality - mean(PCConvQuality, na.rm=TRUE),
-         RobQualc = PCRobotQuality - mean(PCRobotQuality, na.=TRUE),
+         EvalRobotc = PCEvalRobot - mean(PCEvalRobot, na.=TRUE),
          IPUDurC = IPUDur - mean(IPUDur, na.rm=TRUE)) #%>% 
   # filter(scoreEN > 60) # see with and without low-level participants
 
 
 dab <- dab %>%
-  mutate_at(c("condition"), as.factor)
+  mutate_at(c("condition"), as.factor) %>% 
+  group_by(speaker) %>% 
+  mutate(robf0meanc = robPrevf0mean - mean(robPrevf0mean, na.rm=TRUE),
+         robf0sdc = robPrevf0sd - mean(robPrevf0sd, na.rm=TRUE),
+         mockf0meanC = robPrevf0meanMock - mean(robPrevf0meanMock, na.rm=TRUE),
+         mockf0sdC = robPrevf0sdMock - mean(robPrevf0sdMock, na.rm=TRUE)) %>% 
+  ungroup()
 ```
 
 ## Conditions:
@@ -270,6 +276,22 @@ anova(f1,f2)
 
 ```{r}
 summary(f1 <- lmer(f0sd ~ mockf0CVc : condition + (1 + condition | speaker), dac %>% filter(!grepl("Robot", speaker))))
+```
+
+### Comparing beginning and end of dialogue
+
+No convergence
+
+```{r, include=FALSE}
+dac <- dac %>% mutate(convPhase = ifelse(turn %in% c(1,2), "beginning", ifelse(turn %in% c(5, 6), "end", NA)))
+
+# f0 mean: no convergence
+summary(lmer(f0mean ~ robf0meanc : convPhase + (1 | speaker), dac))
+summary(lmer(f0mean ~ robf0meanc : condition : convPhase + (1 + condition | speaker), dac))
+
+# f0 SD: no convergence
+summary(lmer(f0sd ~ robf0sdc : convPhase + (1 | speaker), dac))
+summary(lmer(f0sd ~ robf0sdc : condition : convPhase + (1 + condition | speaker), dac))
 ```
 
 ### Intimacy
@@ -496,7 +518,7 @@ anova(cf1, no1)
 AIC is slightly lower and t value higher. So there seems to be a tendency for people to converge more to the robot they rated as higher quality.
 
 ```{r}
-summary(hl1 <- lmer(f0sd ~ robf0sdc : RobQualc : turnNormal + (1  | speaker), dac %>% filter(!grepl("Robot", speaker))))
+summary(hl1 <- lmer(f0sd ~ robf0sdc : EvalRobotc : turnNormal + (1  | speaker), dac %>% filter(!grepl("Robot", speaker))))
 
 summary(no1 <- lmer(f0sd ~ robf0sdc : turnNormal + (1 | speaker), dac %>% filter(!grepl("Robot", speaker))))
 anova(hl1, no1)
@@ -505,11 +527,6 @@ anova(hl1, no1)
 
   
 ## Using the difference between the human's mean f0 in the current turn and the robot's mean f0 in the preceding turn
-
-```{r, include=FALSE}
-dat <- dac %>% 
-  filter(!duplicated(tgroup))
-```
 
 
 ```{r}
@@ -530,6 +547,8 @@ summary(ft1 <- lmer(f0Diff ~ condition * turnNormal + (1 + condition | speaker),
 
 # f0 during baseline
 
+### f0 mean
+
 ```{r}
 ggplot(dab, aes(robPrevf0mean, f0mean))+
   geom_point()+
@@ -537,19 +556,45 @@ ggplot(dab, aes(robPrevf0mean, f0mean))+
   geom_smooth(method="loess")
 ```
 
-There is no lasting convergence effect.
+There is no lasting convergence effect in f0 mean.
 
 ```{r}
 dab$condition <- relevel(dab$condition, ref="GA")
-summary(fb2 <- lmer(f0mean ~ robPrevf0mean : condition + (1 | speaker), dab))
+summary(fb1 <- lmer(f0mean ~  robf0meanc + (1 | speaker), dab))
+summary(fb2 <- lmer(f0mean ~  robf0meanc  : condition + (1 + condition | speaker), dab))
 ```
 
-Similar result with robot's *mock* f0.
+Also no "convergence" with mock data.
 
 ```{r}
-summary(fbM <- lmer(f0mean ~ robPrevf0meanMock : condition + (1 | speaker), dab))
+summary(fbM <- lmer(f0mean ~ mockf0meanC + (1 | speaker), dab))
+summary(fbM <- lmer(f0mean ~ mockf0meanC : condition + (1 | speaker), dab))
 ```
 
+
+### f0 SD
+
+```{r}
+ggplot(dab, aes(robPrevf0sd, f0sd))+
+  geom_point()+
+  facet_wrap(~condition)+
+  geom_smooth(method="loess")
+```
+
+There is no lasting convergence effect in f0 SD.
+
+```{r}
+dab$condition <- relevel(dab$condition, ref="GA")
+summary(fb1 <- lmer(f0mean ~  robf0sdc + (1 | speaker), dab))
+summary(fb2 <- lmer(f0mean ~  robf0sdc  : condition + (1  | speaker), dab))
+```
+
+Also no "convergence" with mock data.
+
+```{r}
+summary(fbM <- lmer(f0mean ~ mockf0sdC + (1 | speaker), dab))
+summary(fbM <- lmer(f0mean ~ mockf0sdC : condition + (1 | speaker), dab))
+```
 
 # Questionnaire ratings and condition
 
@@ -583,7 +628,7 @@ qqnorm(resid(cq1));qqline(resid(cq1))
 
 
 ```{r}
-ggplot(dac, aes(condition, PCRobotQuality))+
+ggplot(dac, aes(condition, PCEvalRobot))+
   stat_halfeye(adjust = .5,  width = .5, justification = -.2, .width = c(.5, .95), fill="#9bafbd")+
   geom_boxplot(width=.13, notch = TRUE)
 ```
@@ -593,7 +638,7 @@ For the "robot's quality" ratings, the `NG` condition was rated higher -- opposi
 (Model's residuals: also homoskedastic (good), and distribution isn't very normal but better than the conversational quality model above.)
 
 ```{r}
-summary(rq1 <- lmer(PCRobotQuality ~ condition + (1|speaker), dac))
+summary(rq1 <- lmer(PCEvalRobot ~ condition + (1|speaker), dac))
 
 par(mfrow=c(2,2))
 plot(fitted(rq1), resid(rq1))
