@@ -205,9 +205,6 @@ save(f0, file=paste0(folder, "f0.RData"))
 ###############
 ###############
 
-# check if f0 was extracted correctly
-# also show in the plot if there are NAs
-
 load(paste0(folder, "f0.RData"))
 
 dat <- f0 %>% 
@@ -316,17 +313,17 @@ dam <- merge(dat, m, by="participant")
 # for the baseline, robPrevf0 is the average of all the first robot's turns (robPrevf0 in `baseline` only exists for the second baseline)
 # also calculate gapDur, i.e. the gap (in seconds) between the interlocutor's previous turn and speaker's current turn
 
-# for baseline, do a different dataset and create column `overallIPUs`, which are all the IPUs of the robot without dividing them by turn. this will serve for the `robPrevf0` of the baseline
+# for baseline, do a different dataset and create column `overallIPU`, which are all the IPUs of the robot without dividing them by turn. this will serve for the `robPrevf0` of the baseline
 
-b <- data.frame(matrix(nrow=0, ncol=5))
-names(b) <- c("speaker", "IPU", "f0mean", "condition", "overallIPU")
+b <- data.frame(matrix(nrow=0, ncol=6))
+names(b) <- c("speaker", "IPU", "f0mean", "f0sd", "condition", "overallIPU")
 
 for(s in unique(dat$speaker[grepl("Robot", dat$speaker)])){
   for(c in unique(dat$condition)){
     b0 <- dat %>% 
       filter(speaker == s, 
              condition == c) %>%
-      select(c(speaker, IPU, f0mean, condition)) %>% 
+      select(c(speaker, IPU, f0mean, f0sd, condition)) %>% 
       mutate_at("IPU", as.numeric) %>%
       mutate(overallIPU = 1:n())
     b <- rbind(b, b0)
@@ -345,7 +342,8 @@ dam <- dam %>%
 
 dab <- dam %>% filter(task == "Baseline") %>% # Baseline dataset
   select(-c("turn", "gapDur", "f0Diff")) %>% 
-  mutate_at(c("f0mean", "f0sd", "intensMean", "intensMax"), as.numeric)
+  mutate_at(c("f0mean", "f0sd", "intensMean", "intensMax"), as.numeric) %>% 
+  mutate("robPrevf0mean"=NA, "robPrevf0meanMock"=NA, "robPrevf0sd"=NA, "robPrevf0sdMock"=NA)
 dac <- dam %>% filter(task == "Conversation") %>%  # Conversation dataset
   mutate_at(c("turn", "f0mean", "f0sd", "intensMean", "intensMax"), as.numeric) %>% 
   mutate("robPrevf0mean"=NA, "robPrevf0meanMock"=NA, "robPrevf0sd"=NA, "robPrevf0sdMock"=NA, "robPrevIntMean"=NA, "robPrevIntMeanMock"=NA, "robPrevIntMax"=NA, "robPrevIntMaxMock"=NA) %>% 
@@ -418,7 +416,7 @@ for(i in 1:nrow(dac)){ # getting `robPrevf0` for the Conversation dataset
       previousf0meanTurn <- as.numeric(unique(dac$f0turn[dac$speaker == dac$interlocutor[i] &
                                      dac$turn == dac$turn[i] &
                                      dac$condition == dac$condition[i]]))
-      dac$f0Diff[i] <- abs(as.numeric(dac$f0turn[i]) - previousf0Turn)
+      dac$f0Diff[i] <- abs(as.numeric(dac$f0turn[i]) - previousf0meanTurn)
       prevEnd <- as.numeric(unique(dac$turnOffset[dac$speaker == dac$interlocutor[i] &
                                              dac$turn == dac$turn[i] &
                                              dac$condition == dac$condition[i]]))
@@ -428,21 +426,37 @@ for(i in 1:nrow(dac)){ # getting `robPrevf0` for the Conversation dataset
 }
 
 for(i in 1:nrow(dab)){
-  previousf0mean <- b$f0mean[b$speaker == dab$interlocutor[i] &
-                             b$condition == dab$prevCond[i] &
-                             b$overallIPU == dab$overallIPU[i]]
-  if(!purrr::is_empty(previousf0)){
+  previousf0mean <- as.numeric(b$f0mean[b$speaker == dab$interlocutor[i] &
+                                          b$condition == dab$prevCond[i] &
+                                          b$overallIPU == dab$IPU[i]])
+  previousf0sd <- as.numeric(b$f0sd[b$speaker == dab$interlocutor[i] &
+                                      b$condition == dab$prevCond[i] &
+                                      b$overallIPU == dab$IPU[i]])
+  if(!purrr::is_empty(previousf0mean)){
     if(!any(is.na(previousf0mean))){
       dab$robPrevf0mean[i] <- previousf0mean
+    }
+  }
+  if(!purrr::is_empty(previousf0sd)){
+    if(!any(is.na(previousf0sd))){
+      dab$robPrevf0sd[i] <- previousf0sd
     }
   }
   if(dab$condition[i] == substr(dab$Order[i], 1, 2)){
     previousf0meanMock <- as.numeric(b$f0mean[b$speaker == dab$interlocutor[i] &
                                               b$condition == dab$condition[i] &
-                                              b$overallIPU == dab$overallIPU[i]])
-    if(!purrr::is_empty(previousf0Mock)){
-      if(!any(is.na(previousf0Mock))){
+                                              b$overallIPU == dab$IPU[i]])
+    previousf0sdMock <- as.numeric(b$f0sd[b$speaker == dab$interlocutor[i] &
+                                            b$condition == dab$condition[i] &
+                                            b$overallIPU == dab$IPU[i]])
+    if(!purrr::is_empty(previousf0meanMock)){
+      if(!any(is.na(previousf0meanMock))){
         dab$robPrevf0meanMock[i] <- previousf0meanMock
+      }
+    }
+    if(!purrr::is_empty(previousf0sdMock)){
+      if(!any(is.na(previousf0sdMock))){
+        dab$robPrevf0sdMock[i] <- previousf0sdMock
       }
     }
   }
@@ -470,7 +484,6 @@ q <- read.csv(paste0(folder2, "questions.csv"), header=TRUE, dec=".", sep=";") %
   mutate(turn = 1:n()) %>% 
   ungroup()
     
-
 # match participant to question text + rating based on `q`
 
 dac <- dac %>% 
@@ -494,27 +507,33 @@ dpN <- dac %>%
 names(dpN) <- c("speaker", paste0("I", 1:12))
 dp <- rbind(dpN, dpG)
 
-pc <- principal_components(dp[,2:13], n = 3, threshold = 0.3, standardize = TRUE, rotation="varimax")
+pc <- principal_components(dp[,2:13], n = 3, threshold = 0.4, standardize = TRUE, rotation="varimax")
 summary(pc)
 # write.csv(pc, paste0(folder, "loadings2.csv"))
 
 # rename questionnaire columns so they make sense
 # also get rid of all the TMF columns: transform them into on TMF.F and one TMF.M
 
-questionnaire <- data.frame(questionNumber = c(1:12),
+# the following questionnaire datasets are organized around the principal components identified in the PCA above
+
+questionnaire1 <- data.frame(questionNumber = c(1, 2, 3, 9, 10, 11, 12),
                             question = c("conversationFlow",
                                          "floorYield",
                                          "floorHold",
-                                         "robTiming",
-                                         "faceHumanlike",
-                                         "voiceHumanlike",
-                                         "behaviorHumanlike",
-                                         "generalHumanlike",
                                          "enjoyTalkingToRob",
                                          "positiveAboutRob",
                                          "positiveAboutConv",
                                          "comfortTalkingToRob"),
-                            dimension = c(rep("PCConvQuality", 3), rep("PCRobotQuality", 4), NA, rep("PCConvQuality", 4))) # these components are based on the PCA above
+                            dimension = c(rep("PCConvQuality", 7)))
+
+questionnaire2 <- data.frame(questionNumber = c(4, 5, 6, 7, 12),
+                            question = c("robTiming",
+                                         "faceHumanlike",
+                                         "voiceHumanlike",
+                                         "behaviorHumanlike",
+                                         "comfortTalkingToRob"),
+                            dimension = c(rep("PCEvalRobot", 5)))
+
 
 dacsave <- dac
 dac <- dacsave
@@ -528,27 +547,27 @@ daq <- dac %>%
          condition = substr(condition, 1, 2))
 
 daqsave <- daq
+# daq <- daqsave
 
-daq <- merge(daq, questionnaire, by="questionNumber") %>% 
-  filter(!is.na(dimension)) %>% 
-  group_by(speaker, dimension, condition) %>% 
+daq1 <- merge(daq, questionnaire1, by="questionNumber") %>%
+  group_by(speaker, condition) %>% 
   mutate(dimensionRating = mean(rating, na.rm=TRUE)) %>%
   ungroup() %>% 
   select(-questionNumber) %>% 
   spread(key=dimension, value=dimensionRating) %>% 
-  spread(key=question, value = rating)
+  spread(key=question, value = rating) %>% 
+  select(1:3)
 
-# this produces three rows per speaker/condition, each with a bunch of NAs and a couple of values.
-# to put these rows together into one row per speaker/condition, do the following
-# (taken from https://stackoverflow.com/questions/45515218/combine-rows-in-data-frame-containing-na-to-make-complete-row)
+daq2 <- merge(daq, questionnaire2, by="questionNumber") %>%
+  group_by(speaker, condition) %>% 
+  mutate(dimensionRating = mean(rating, na.rm=TRUE)) %>%
+  ungroup() %>% 
+  select(-questionNumber) %>% 
+  spread(key=dimension, value=dimensionRating) %>% 
+  spread(key=question, value = rating) %>% 
+  select(1:3)
 
-coalesce_by_column <- function(daq) {
-  return(dplyr::coalesce(!!! as.list(daq)))
-}
-
-daq <- daq %>%
-  group_by(speaker, condition) %>%
-  summarise_all(coalesce_by_column)
+daq <- full_join(daq1, daq2, by=c("speaker", "condition"))
 
 dac <- dac %>%
   select(-c(GA.1:NG.12))
