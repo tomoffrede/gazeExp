@@ -172,11 +172,7 @@ anova(t1, t2)
 ### f0 mean
 
 ```{r}
-dat <- dac %>% 
-  filter(abs(f0meanZ) < 2.5,
-         abs(robf0meanZ) < 2.5)
-
-ggplot(dat, aes(robf0meanc, f0mean))+
+ggplot(dac, aes(robf0meanc, f0mean))+
   geom_point()+
   facet_wrap(~condition)+
   geom_smooth(method="lm")
@@ -186,30 +182,22 @@ ggplot(dat, aes(robf0meanc, f0mean))+
 See:
 
 ```{r}
-dat <- dac %>% 
-  filter(abs(f0meanZ) < 2.5,
-         abs(robf0meanZ) < 2.5)
-
 dac$condition <- relevel(dac$condition, ref="NG")
 
-summary(f1 <- lmer(f0mean ~ robf0meanc : condition : turn + (1 + condition | speaker), dat))
+summary(f1 <- lmer(f0mean ~ robf0meanc : condition : turn + (1 + condition | speaker), dac))
 
 ```
 
 ### f0 SD
 
 ```{r}
-dat <- dac %>% 
-  filter(abs(f0sdZ) < 2.5,
-         abs(robf0sdZ) < 2.5)
-
-ggplot(dat %>% filter(condition=="NG"), aes(robf0sdc, f0sd))+
+ggplot(dac %>% filter(condition=="NG"), aes(robf0sdc, f0sd))+
   geom_point()+
   facet_wrap(~as.factor(turn))+
   geom_smooth(method="lm")+
   ggtitle("Fixed Gaze")
 
-ggplot(dat %>% filter(condition=="GA"), aes(robf0sdc, f0sd))+
+ggplot(dac %>% filter(condition=="GA"), aes(robf0sdc, f0sd))+
   geom_point()+
   facet_wrap(~as.factor(turn))+
   geom_smooth(method="lm")+
@@ -220,11 +208,7 @@ ggplot(dat %>% filter(condition=="GA"), aes(robf0sdc, f0sd))+
 * People seem to diverge on F0 SD from the robot that does GA.
 
 ```{r}
-dat <- dac %>% 
-  filter(abs(f0sdZ) < 2.5,
-         abs(robf0sdZ) < 2.5)
-
-summary(f2 <- lmer(f0sd ~ robf0sdc : condition : turn : f0mean + (1 + condition | speaker), dat))
+summary(f2 <- lmer(f0sd ~ robf0sdc : condition : turn + (1 + condition | speaker), dac))
 
 par(mfrow=c(2,2))
 hist(resid(f2))

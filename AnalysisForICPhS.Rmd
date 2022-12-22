@@ -63,7 +63,7 @@ dac <- dac %>%
          Extrac = Extraversion - mean(Extraversion, na.rm=TRUE),
          IOc = IntellectOpenness - mean(IntellectOpenness, na.rm=TRUE),
          ConvQualc = PCConvQuality - mean(PCConvQuality, na.rm=TRUE),
-         RobQualc = PCRobotQuality - mean(PCRobotQuality, na.=TRUE),
+         EvalRobc = PCEvalRobot - mean(PCEvalRobot, na.=TRUE),
          IPUDurC = IPUDur - mean(IPUDur, na.rm=TRUE)) #%>% 
   # filter(scoreEN > 60) # see with and without low-level participants
 
@@ -132,7 +132,6 @@ summary(f1 <- lmer(f0mean ~ robf0meanc : condition : turn + (1 + condition | spe
 
 ```{r}
 summary(f1 <- lmer(f0sd ~ robf0sdc : condition : turn + (1 + condition | speaker), dat))
-
 ```
 
 #### f0 mean plots
@@ -187,7 +186,7 @@ for(s in c("MDE", "JBY", "FQD")){
         theme_classic()+
         geom_point()+
         geom_smooth(method="loess")+
-        scale_color_viridis_d(end=0.6, labels=c("Human", "Robot"))+
+        scale_color_grey(labels=c("Human", "Robot"))+
         labs(title="A",
              color="Speaker",
              y="F0 mean",
@@ -202,7 +201,7 @@ for(s in c("MDE", "JBY", "FQD")){
         theme_classic()+
         geom_point()+
         geom_smooth(method="loess")+
-        scale_color_viridis_d(end=0.6, labels=c("Human", "Robot"))+
+        scale_color_grey(labels=c("Human", "Robot"))+
         labs(title="C",
              color="Speaker",
              y="F0 mean",
@@ -217,7 +216,7 @@ for(s in c("MDE", "JBY", "FQD")){
         theme_classic()+
         geom_point()+
         geom_smooth(method="loess")+
-        scale_color_viridis_d(end=0.6, labels=c("Human", "Robot"))+
+        scale_color_grey(labels=c("Human", "Robot"))+
         labs(title="B",
              color="Speaker",
              y="F0 mean",
@@ -236,3 +235,15 @@ fig <- annotate_figure(arr, top = text_grob("Examples of F0 mean patterns", size
 ggsave(paste0(folder, "icphs.png"), plot=fig, height=2000, width=1500, units = "px")
 
 ```
+
+# Calculate number of IPUs per turn -- just to check
+
+```{r}
+IPUno <- dac %>% 
+  select(-c("task":"IPUDurC")) %>% 
+  group_by(speaker, condition, turn) %>% 
+  mutate(numberIPUs = n()) %>% 
+  ungroup
+table(IPUno$numberIPUs)
+```
+
