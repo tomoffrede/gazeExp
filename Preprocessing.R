@@ -1,5 +1,7 @@
 # Extract data and create dataset for speech (and eye gaze?) data of HRI experiment
 
+entireScriptStartTime <- Sys.time()
+
 library(rPraat)
 library(tidyverse)
 library(lme4)
@@ -17,7 +19,7 @@ folder2 <- "C:/Users/offredet/Documents/1HU/ExperimentEyes/Data/"
 # voices: one was slower and one faster. we tried to counterbalance them across orders but it wasn't a perfect balance (something like 20-30)
 # this could be the source of the effect
 
-## (part of it adapted from AudioData.R)
+## (part of this code was adapted from AudioData.R)
 
 filesTG <- list.files(folder, "\\.TextGrid")
 filesTG <- filesTG[!grepl("VUV", filesTG)]
@@ -36,8 +38,10 @@ startTime <- Sys.time()
 for(i in 1:nrow(files)){
   tg <- tg.read(paste0(folder, files$filesTG[[i]]), encoding=detectEncoding(paste0(folder, files$filesTG[[i]])))
   txt <- read.table(paste0(folder, files$filesTXT[[i]]), header=TRUE, na.strings = "--undefined--") %>% 
-    mutate(f0z = (f0mean - mean(f0mean, na.rm=TRUE))/sd(f0mean, na.rm=TRUE)) %>% 
-    filter(abs(f0z) < 2.5)
+    mutate(f0meanz = (f0mean - mean(f0mean, na.rm=TRUE))/sd(f0mean, na.rm=TRUE),
+           f0sdz = (f0sd - mean(f0sd, na.rm=TRUE))/sd(f0sd, na.rm=TRUE),
+           f0mean = ifelse(abs(f0meanz) > 2.5, NA, f0mean),
+           f0sd = ifelse(abs(f0sdz) > 2.5, NA, f0sd))
   
   if(substr(files$filesTG[i], 4, 5) == "BL"){ # baseline speech recordings
     ipuCount <- 0
@@ -63,20 +67,20 @@ for(i in 1:nrow(files)){
               }
             }
             if(any(!is.na(f))){
-              f0[nrow(f0)+1,] <- c(substr(files$filesTG[i], 1, 9),
-                                   substr(files$filesTG[i], 7, 9),
-                                   "baseline", # "turn"
-                                   startBL,
-                                   endBL,
-                                   as.numeric(endBL - startBL), # duration of entire baseline
-                                   ipuCount,
-                                   startIPU,
-                                   endIPU,
-                                   as.numeric(endIPU - startIPU), # duration of IPU
-                                   mean(f$f0mean, na.rm=TRUE),
-                                   mean(f$f0sd, na.rm=TRUE),
-                                   mean(f$intMean, na.rm=TRUE),
-                                   max(f$intMax, na.rm=TRUE))
+                f0[nrow(f0)+1,] <- c(substr(files$filesTG[i], 1, 9),
+                                     substr(files$filesTG[i], 7, 9),
+                                     "baseline", # "turn"
+                                     startBL,
+                                     endBL,
+                                     as.numeric(endBL - startBL), # duration of entire baseline
+                                     ipuCount,
+                                     startIPU,
+                                     endIPU,
+                                     as.numeric(endIPU - startIPU), # duration of IPU
+                                     mean(f$f0mean, na.rm=TRUE),
+                                     mean(f$f0sd, na.rm=TRUE),
+                                     mean(f$intMean, na.rm=TRUE),
+                                     max(f$intMax, na.rm=TRUE))
             }
           }
         } 
@@ -213,59 +217,6 @@ dat <- f0 %>%
          tgroup = paste(groupings, turn, sep=".")) %>% 
   mutate_at(c("IPUOnset", "IPUOffset", "IPUDur", "turnOnset", "turnOffset", "turnDur"), as.numeric)
 
-{
-# datp <- dat
-# for(i in unique(datp$speaker)){
-#   dat0 <- datp %>% filter(speaker == i)
-#   par(mfrow=c(3, 2))
-#   for(g in unique(dat0$groupings)){
-#     dat <- dat0 %>% filter(groupings == g)
-#     plot(dat$IPU, dat$f0mean, type="l", main=g)
-#   }
-#   readline("Enter to continue")
-# }
-
-# lots of weird data!
-
-# calculate proportion of NA
-
-# f0 <- f0 %>%
-#   # group_by(speaker, condition, task) %>%
-#   group_by(groupings) %>%
-#   mutate(NAprop = sum(is.na(f0mean)) / n()) %>%
-#   ungroup()
-
-# length(unique(f0$NAprop))
-# length(unique(f0$groupings))
-
-# in the following i think the idea was to get the amount of NA also grouping per turn of each speaker
-# but i don't see the point in that anymore, so forget it.
-# 
-# c <- data.frame(matrix(nrow=0, ncol=4))
-# names(c) <- c("turn", "f0mean", "groupings", "NAprop")
-# 
-# for(g in unique(f0$groupings)){
-#   c0 <- f0 %>% 
-#     filter(groupings == g) %>% 
-#     select(turn, f0mean, groupings) %>%
-#     mutate(NAprop = sum(is.na(f0mean)) / n())
-#   c <- rbind(c, c0)
-# }
-# 
-# f0a <- full_join(f0, c, by=c("groupings", "turn", "f0mean"), all=TRUE)
-# f0a <- f0a %>% distinct()
-# # na <- f0a[!duplicated(f0a$groupings)]
-# na <- f0a %>% distinct(groupings, .keep_all=TRUE)
-# hist(na$NAprop)
-
-# end of unnecessarily complicated code
-
-# hist(f0$NAprop)
-
-# I'm not sure how to deal with it. why is there so much NA?
-# should we exclude files with too many NAs? what would be the cutoff point?
-  }
-
 # for each turn of the human, save `robPrevf0`, i.e. the f0 of the robot's previous turn
 # for the first IPU of the human, robPrevf0 is the f0 of the robot's first IPU in the previous turn. human's second IPU is robot's second IPU u.s.w
 
@@ -277,8 +228,6 @@ dat <- f0 %>%
 dt <- data.frame(matrix(nrow=0, ncol=2))
 names(dt) <- c("tgroup", "f0turn")
 
-# t=unique(dat$tgroup[!grepl("baseline", dat$tgroup)])[[5]]
-
 for(t in unique(dat$tgroup)){
   d <- dat %>%
     filter(tgroup == t)
@@ -287,9 +236,9 @@ for(t in unique(dat$tgroup)){
 
 dat <- merge(dat, dt, by="tgroup")
 
-# # to get the `robPrevf0` for the baseline, turn all the previous robot's IPUs into one long list of IPUs (not divided by turn),
-# # then do invIPU like for the conversation
-# 
+# to get the `robPrevf0` for the baseline, turn all the previous robot's IPUs into one long list of IPUs (not divided by turn),
+# then do invIPU like for the conversation
+
 dat <- dat %>%
   mutate(interlocutor = ifelse(nchar(speaker)==3, paste0(speaker, "-Robot"), substr(speaker, 1, 3)),
          robPrevf0mean = NA,
@@ -314,6 +263,7 @@ dam <- merge(dat, m, by="participant")
 # also calculate gapDur, i.e. the gap (in seconds) between the interlocutor's previous turn and speaker's current turn
 
 # for baseline, do a different dataset and create column `overallIPU`, which are all the IPUs of the robot without dividing them by turn. this will serve for the `robPrevf0` of the baseline
+# also, in baseline, save the person's 
 
 b <- data.frame(matrix(nrow=0, ncol=6))
 names(b) <- c("speaker", "IPU", "f0mean", "f0sd", "condition", "overallIPU")
@@ -343,7 +293,7 @@ dam <- dam %>%
 dab <- dam %>% filter(task == "Baseline") %>% # Baseline dataset
   select(-c("turn", "gapDur", "f0Diff")) %>% 
   mutate_at(c("f0mean", "f0sd", "intensMean", "intensMax"), as.numeric) %>% 
-  mutate("robPrevf0mean"=NA, "robPrevf0meanMock"=NA, "robPrevf0sd"=NA, "robPrevf0sdMock"=NA)
+  mutate("robPrevf0mean"=NA, "robPrevf0meanMock"=NA, "robPrevf0sd"=NA, "robPrevf0sdMock"=NA, "humanPrevf0mean"=NA, "humanPrevf0sd"=NA)
 dac <- dam %>% filter(task == "Conversation") %>%  # Conversation dataset
   mutate_at(c("turn", "f0mean", "f0sd", "intensMean", "intensMax"), as.numeric) %>% 
   mutate("robPrevf0mean"=NA, "robPrevf0meanMock"=NA, "robPrevf0sd"=NA, "robPrevf0sdMock"=NA, "robPrevIntMean"=NA, "robPrevIntMeanMock"=NA, "robPrevIntMax"=NA, "robPrevIntMaxMock"=NA) %>% 
@@ -449,6 +399,12 @@ for(i in 1:nrow(dab)){
     previousf0sdMock <- as.numeric(b$f0sd[b$speaker == dab$interlocutor[i] &
                                             b$condition == dab$condition[i] &
                                             b$overallIPU == dab$IPU[i]])
+    Hpreviousf0mean <- as.numeric(dab$f0mean[dab$speaker == dab$speaker[i] &
+                                               dab$condition != dab$condition[i] &
+                                               dab$IPU == dab$IPU[i]])
+    Hpreviousf0sd <- as.numeric(dab$f0sd[dab$speaker == dab$speaker[i] &
+                                           dab$condition != dab$condition[i] &
+                                           dab$IPU == dab$IPU[i]])
     if(!purrr::is_empty(previousf0meanMock)){
       if(!any(is.na(previousf0meanMock))){
         dab$robPrevf0meanMock[i] <- previousf0meanMock
@@ -457,6 +413,16 @@ for(i in 1:nrow(dab)){
     if(!purrr::is_empty(previousf0sdMock)){
       if(!any(is.na(previousf0sdMock))){
         dab$robPrevf0sdMock[i] <- previousf0sdMock
+      }
+    }
+    if(!purrr::is_empty(Hpreviousf0mean)){
+      if(!any(is.na(Hpreviousf0mean))){
+        dab$humanPrevf0mean[i] <- Hpreviousf0mean
+      }
+    }
+    if(!purrr::is_empty(Hpreviousf0sd)){
+      if(!any(is.na(Hpreviousf0sd))){
+        dab$humanPrevf0sd[i] <- Hpreviousf0sd
       }
     }
   }
@@ -621,7 +587,50 @@ db <- db %>%
 dac <- merge(dac, db, by="speaker", all=TRUE) %>% 
   select(-c(BFI1:BFI40, X))
 
+# also transform the questionnaire data in the dab dataset into something meaningful like you did for dac
+
+info <- dac %>% 
+  select(speaker, condition, PCConvQuality, PCEvalRobot, TMF.F, TMF.M, Agreeableness, Conscientiousness, EmotionalStability, Extraversion, IntellectOpenness) %>% 
+  distinct() %>% 
+  filter(!grepl("Robot", speaker))
+
+dab <- dab %>% 
+  select(-c("X", "GA.1":"NG.12", "TMF.M1":"BFI40"))
+
+dab <- full_join(dab, info, by=c("speaker", "condition"))
+
+
+# create dataset that can compare the baseline and the conversation data more directly
+
+dac <- dac %>% 
+  group_by(speaker, condition) %>% 
+  mutate(overallIPU = 1:n()) %>% 
+  ungroup() %>% 
+  mutate("baselinef0mean"=NA, "baselinef0sd"=NA)
+
+for(i in 1:nrow(dac)){
+  bf0mean <- as.numeric(dab$f0mean[dab$speaker == dac$speaker[i] &
+                                     dab$condition == dac$condition[i] &
+                                     dab$IPU  == dac$overallIPU[i]])
+  bf0sd <- as.numeric(dab$f0sd[dab$speaker == dac$speaker[i] &
+                                 dab$condition == dac$condition[i] &
+                                 dab$IPU  == dac$overallIPU[i]])
+  if(!purrr::is_empty(bf0mean)){
+    if(!any(is.na(bf0mean))){
+      dac$baselinef0mean[i] <- bf0mean
+    }
+  }
+  if(!purrr::is_empty(bf0sd)){
+    if(!any(is.na(bf0sd))){
+      dac$baselinef0sd[i] <- bf0sd
+    }
+  }
+}
+
 # save files
 
 save(dac, file = paste0(folder, "dataConversation.RData"))
 save(dab, file = paste0(folder, "dataBaseline.RData"))
+
+entireScriptEndTime <- Sys.time()
+entireScriptEndTime-entireScriptStartTime
