@@ -8,7 +8,7 @@ library(lme4)
 library(parameters) # for PCA
 `%!in%` <- Negate(`%in%`)
 
-folder <- "C:/Users/offredet/Documents/1HU/ExperimentEyes/Data/All/"
+folder <- "C:/Users/offredet/Documents/1HU/ExperimentEyes/Data/All-NotFiltered/"
 folder2 <- "C:/Users/offredet/Documents/1HU/ExperimentEyes/Data/"
 
 # (referring to a previously written regression with turnDuration ~ Condition:)
@@ -280,12 +280,6 @@ for(s in unique(dat$speaker[grepl("Robot", dat$speaker)])){
   }
 }
 
-# t <- dam %>%
-#   filter(grepl("Robot", speaker)) %>%
-#   group_by(speaker, condition) %>% 
-#   summarize(mean = mean(f0mean, na.rm=TRUE)) %>%
-#   ungroup()
-
 dam <- dam %>% 
   mutate(prevCond = substr(Order, 1, 2)) %>% 
   mutate(prevCond = ifelse(condition == prevCond, NA, prevCond))
@@ -363,7 +357,7 @@ for(i in 1:nrow(dac)){ # getting `robPrevf0` for the Conversation dataset
       if(!purrr::is_empty(previousIntMax)){
         dac$robPrevIntMaxMock[i] <- previousIntMax
       }
-      previousf0meanTurn <- as.numeric(unique(dac$f0turn[dac$speaker == dac$interlocutor[i] &
+      previousf0meanTurn <- unique(as.numeric(dac$f0turn[dac$speaker == dac$interlocutor[i] &
                                      dac$turn == dac$turn[i] &
                                      dac$condition == dac$condition[i]]))
       dac$f0Diff[i] <- abs(as.numeric(dac$f0turn[i]) - previousf0meanTurn)
@@ -427,8 +421,6 @@ for(i in 1:nrow(dab)){
     }
   }
 }
-
-# we don't need to calculate `robmeanPrevf0` for the robot, because the robot's speech wasn't influenced by the human anyway
 
 dL <- list(dab, dac)
 for(d in 1:length(dL)){
@@ -574,7 +566,7 @@ db <- db %>%
   spread(key=dimensionBFI, value=dimensionBFIRating) %>% 
   select(-c("adjNumber", "rating", "adjectiveBFI", "inverted"))
 
-# again, the rows with NAs...
+# the following is to collapse all the rows that should be together (but are right now containing one (correct) value and many NAs)
 
 coalesce_by_column <- function(db) {
   return(dplyr::coalesce(!!! as.list(db)))
@@ -598,7 +590,6 @@ dab <- dab %>%
   select(-c("X", "GA.1":"NG.12", "TMF.M1":"BFI40"))
 
 dab <- full_join(dab, info, by=c("speaker", "condition"))
-
 
 # create dataset that can compare the baseline and the conversation data more directly
 
