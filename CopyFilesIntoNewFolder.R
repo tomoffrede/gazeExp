@@ -3,7 +3,7 @@
 
 # first get a list of all the speakers (taken from CreateNewFolder.R)
 
-folder <- "C:/Users/offredet/Documents/1HU/ExperimentEyes/Data/All/"
+folder <- "C:/Users/offredet/Documents/1HU/ExperimentEyes/Data/All-NotFiltered/"
 files <- list.files(folder, "\\.WAV|\\.TextGrid")
 ftg <- files[grepl("TextGrid", files)]
 fwv <- files[grepl("WAV", files)]
@@ -18,21 +18,19 @@ sp <- unique(all$speaker)
 
 # now copy the .txt files from the individual folders into the All folder
 
-folderSpeakers <- "C:/Users/offredet/Documents/1HU/ExperimentEyes/Data/OneChannel/PerSpeaker/"
-folderAll <- "C:/Users/offredet/Documents/1HU/ExperimentEyes/Data/OneChannel/"
+folderSpeakers <- "C:/Users/offredet/Documents/1HU/ExperimentEyes/Data/OneChannelFiltered/"
+folderAll <- "C:/Users/offredet/Documents/1HU/ExperimentEyes/Data/All/"
 
-# sp <- c("AMO", "BHH", "CVZ", "DHI", "DMT", "FQD")
-
-# for(s in sp){
-#   folderCurrentSpeaker <- paste0(folderSpeakers, s, "/")
-#   files <- list.files(folderCurrentSpeaker, "\\.txt")
-#   files <- files[!grepl("Register", files)]
-#   files <- paste0(folderCurrentSpeaker, files)
-#   file.copy(files, folderAll)
-# }
+for(s in sp){
+  folderCurrentSpeaker <- paste0(folderSpeakers, s, "/")
+  files <- list.files(folderCurrentSpeaker, "\\.txt")
+  files <- files[!grepl("Register", files)]
+  files <- paste0(folderCurrentSpeaker, files)
+  file.copy(files, folderAll)
+}
 
 # copy only WAV files from All folder to another AllWAV folder
-# 
+
 # folderAll <- "C:/Users/offredet/Documents/1HU/ExperimentEyes/Data/All/"
 # folderAllWAV <- "C:/Users/offredet/Documents/1HU/ExperimentEyes/Data/AllWAV/"
 # 
