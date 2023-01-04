@@ -1,0 +1,336 @@
+---
+title: "FinalModels-ICPhS"
+author: "Tom Offrede"
+date: "2022-12-09"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, include=FALSE}
+library(tidyverse)
+library(lme4)
+library(ggdist)
+
+`%!in%` <- Negate(`%in%`)
+
+folder <- "C:/Users/offredet/Documents/1HU/ExperimentEyes/Data/All/"
+folderConvPlots <- "C:/Users/offredet/Documents/1HU/ExperimentEyes/Data/ConvergencePlots/"
+files <- list.files(folder, "RData")
+fileBase <- files[grepl("Baseline", files)]
+fileConv <- files[grepl("Conversation", files) & !grepl("Including", files)]
+
+load(paste0(folder, "dataBaseline.RData"))
+load(paste0(folder, "dataConversation.RData"))
+
+dac <- dac[!grepl("Impairment|Dyslexia|Gender|Education|Age", names(dac))]
+
+dac <- dac %>%
+  filter(!grepl("Robot", speaker)) %>% 
+  mutate_at(c("turnDur", "turn", "f0mean", "f0sd", "intensMean", "intensMax", "robPrevf0mean", "robPrevf0meanMock", "gapDur", "intimMean", "intimSD", "intimMed", "IPUDur", "robPrevf0sd", "robPrevf0sdMock", "robPrevIntMean", "robPrevIntMeanMock", "robPrevIntMax", "robPrevIntMaxMock"), as.numeric) %>%
+  mutate_at(c("speaker", "condition", "Order", "task"), as.factor) %>% 
+  group_by(speaker) %>%
+  mutate(turnDurNormal = (turnDur - min(turnDur, na.rm = TRUE)) / (max(turnDur, na.rm = TRUE) - min(turnDur, na.rm = TRUE)),
+         turnDurc = turnDur - mean(turnDur, na.rm=TRUE),
+         robf0meanc = robPrevf0mean - mean(robPrevf0mean, na.rm=TRUE),
+         robf0sdc = robPrevf0sd - mean(robPrevf0sd, na.rm=TRUE),
+         robIntMeanc = robPrevIntMean - mean(robPrevIntMean, na.rm=TRUE),
+         robIntMaxc = robPrevIntMax - mean(robPrevIntMax, na.rm=TRUE),
+         intimc = intimMean - mean(intimMean, na.rm=TRUE),
+         intensMeanC = intensMean - mean(intensMean, na.rm=TRUE),
+         intensMaxC = intensMax - mean(intensMax, na.rm=TRUE),
+         f0CV = f0sd / f0mean,
+         robf0CV = robPrevf0sd / robPrevf0mean,
+         robf0CVc = robf0CV - mean(robf0CV, na.rm=TRUE),
+         mockf0meanC = robPrevf0meanMock - mean(robPrevf0meanMock, na.rm=TRUE),
+         mockf0sdC = robPrevf0sdMock - mean(robPrevf0sdMock, na.rm=TRUE),
+         mockf0CV = robPrevf0sdMock / robPrevf0meanMock,
+         mockf0CVc = mockf0CV - mean(mockf0CV, na.rm=TRUE),
+         f0sdZ = (f0sd - mean(f0sd, na.rm=TRUE))/sd(f0sd, na.rm=TRUE),
+         robf0sdZ = robf0sdc / sd(robPrevf0sd, na.rm=TRUE),
+         f0CVz = (f0CV - mean(f0CV, na.rm=TRUE))/sd(f0CV, na.rm=TRUE),
+         robf0CVz = robf0CVc / sd(robf0CV, na.rm=TRUE),
+         f0meanZ = (f0mean - mean(f0mean, na.rm=TRUE))/sd(f0mean, na.rm=TRUE),
+         robf0meanZ = robf0meanc / sd(robPrevf0mean, na.rm = TRUE),
+         f0meanc = (f0mean - mean(f0mean, na.rm=TRUE)/sd(f0mean, na.rm=TRUE)),
+         f0sdc = (f0sd - mean(f0sd, na.rm=TRUE)/sd(f0sd, na.rm=TRUE))) %>%
+  ungroup() %>% 
+  mutate(ESc = EmotionalStability - mean(EmotionalStability, na.rm=TRUE),
+         Agreec = Agreeableness - mean(Agreeableness, na.rm=TRUE),
+         Conscc = Conscientiousness - mean(Conscientiousness, na.rm=TRUE),
+         Extrac = Extraversion - mean(Extraversion, na.rm=TRUE),
+         IOc = IntellectOpenness - mean(IntellectOpenness, na.rm=TRUE),
+         ConvQualc = PCConvQuality - mean(PCConvQuality, na.rm=TRUE),
+         EvalRobotc = PCEvalRobot - mean(PCEvalRobot, na.=TRUE),
+         IPUDurC = IPUDur - mean(IPUDur, na.rm=TRUE)) #%>% 
+  # filter(scoreEN > 60) # see with and without low-level participants
+
+
+dab <- dab %>%
+  mutate_at(c("condition"), as.factor) %>% 
+  group_by(speaker) %>% 
+  mutate(robf0meanc = robPrevf0mean - mean(robPrevf0mean, na.rm=TRUE),
+         robf0sdc = robPrevf0sd - mean(robPrevf0sd, na.rm=TRUE),
+         mockf0meanC = robPrevf0meanMock - mean(robPrevf0meanMock, na.rm=TRUE),
+         mockf0sdC = robPrevf0sdMock - mean(robPrevf0sdMock, na.rm=TRUE)) %>% 
+  ungroup()
+```
+
+### Robot's effect on convergence
+
+#### f0 mean
+
+```{r}
+ggplot(dac, aes(robPrevf0mean, f0mean))+
+  geom_point()+
+  geom_smooth()
+```
+
+There is a general effect of convergence to the robots. There is also a *condition* effect: people only converge to the robot in the *Gaze Aversion* condition.
+
+```{r}
+summary(f1 <- lmer(f0mean ~ robf0meanc + (1 | speaker), dac))
+
+summary(f2 <- lmer(f0mean ~ robf0meanc : condition + (1 | speaker), dac)) # no random slopes so that this model is comparable with the one above
+anova(f1, f2)
+
+par(mfrow=c(2,2))
+hist(resid(f1))
+qqnorm(resid(f1));qqline(resid(f1))
+plot(fitted(f1), resid(f1))
+```
+
+#### f0 mean plots
+
+```{r}
+# dat <- dac %>%
+#   group_by(speaker, condition) %>% 
+#   mutate(IPUoverall = 1:n()) %>% 
+#   ungroup() %>% 
+#   select(speaker, turn, IPUoverall, f0mean, robPrevf0mean, condition)
+# 
+# for(s in unique(dac$speaker)){
+#   for(c in unique(dac$condition)){
+#     if(c=="NG"){cond = "Fixed Gaze"}else{cond = "Gaze Aversion"}
+#     d <- dat %>%
+#       filter(speaker==s, condition==c)
+#     dR <- d %>%
+#       select(-f0mean) %>% 
+#       rename(f0mean = robPrevf0mean) %>% 
+#       mutate(speaker = "Robot")
+#     d$robPrevf0mean <- NULL
+#     d <- rbind(d, dR)
+#     ggplot(d, aes(IPUoverall, f0mean, color=speaker))+
+#       geom_point()+
+#       geom_smooth(method="loess")+
+#       ggtitle(paste0(s, " - ", cond))
+#     ggsave(paste0(folderConvPlots, c, "-", s, ".png"))
+#   }
+# }
+# 
+# # for paper: NG-MDE (convergence/synchrony), GA-FQD (divergence), NG-JBY (conv then div)
+# 
+# for(s in c("MDE", "JBY", "FQD")){
+#   if(s!="FQD"){
+#     d <- dat %>%
+#       filter(speaker==s, condition=="NG")
+#   }
+#   if(s=="FQD"){
+#     d <- dat %>%
+#       filter(speaker==s, condition=="GA")
+#   }
+#     dR <- d %>%
+#       select(-f0mean) %>% 
+#       rename(f0mean = robPrevf0mean) %>% 
+#       mutate(speaker = "Robot")
+#     d$robPrevf0mean <- NULL
+#     d <- rbind(d, dR)
+#     if(s=="MDE"){
+#       m <- ggplot(d, aes(IPUoverall, f0mean, color=speaker))+
+#         theme_classic()+
+#         geom_point()+
+#         geom_smooth(method="loess")+
+#         scale_color_grey(labels=c("Human", "Robot"))+
+#         labs(title="A",
+#              color="Speaker",
+#              y="F0 mean",
+#              x="Time")+
+#         theme(axis.text.x=element_blank(),
+#               axis.ticks.y = element_blank(),
+#               axis.ticks.x = element_blank())+
+#         ylim(100,200)
+#     }
+#     if(s=="JBY"){
+#       j <- ggplot(d, aes(IPUoverall, f0mean, color=speaker))+
+#         theme_classic()+
+#         geom_point()+
+#         geom_smooth(method="loess")+
+#         scale_color_grey(labels=c("Human", "Robot"))+
+#         labs(title="C",
+#              color="Speaker",
+#              y="F0 mean",
+#              x="Time")+
+#         theme(axis.text.x=element_blank(),
+#               axis.ticks.y = element_blank(),
+#               axis.ticks.x = element_blank())+
+#         ylim(100,200)
+#     }
+#     if(s=="FQD"){
+#       f <- ggplot(d, aes(IPUoverall, f0mean, color=speaker))+
+#         theme_classic()+
+#         geom_point()+
+#         geom_smooth(method="loess")+
+#         scale_color_grey(labels=c("Human", "Robot"))+
+#         labs(title="B",
+#              color="Speaker",
+#              y="F0 mean",
+#              x="Time")+
+#         theme(axis.text.x=element_blank(),
+#               axis.ticks.y = element_blank(),
+#               axis.ticks.x = element_blank())+
+#         ylim(100,200)
+#     }
+#   }
+# }
+# 
+# arr <- ggarrange(m, f, j, ncol=1)
+# fig <- annotate_figure(arr, top = text_grob("Examples of F0 mean patterns", size=16))
+# 
+# ggsave(paste0(folder, "icphs.png"), plot=fig, height=2000, width=1500, units = "px")
+
+```
+
+# Calculate number of IPUs per turn -- just to check
+
+```{r}
+IPUno <- dac %>% 
+  select(speaker, condition, turn) %>% 
+  group_by(speaker, condition, turn) %>% 
+  mutate(numberIPUs = n()) %>% 
+  ungroup() %>% 
+  distinct()
+table(IPUno$numberIPUs)
+```
+
+### Intimacy
+
+#### Convergence
+
+```{r}
+summary(f1 <- lmer(f0mean ~ robf0meanc : intimc + (1 | speaker), dac))
+```
+
+#### f0 mean
+
+intimacy reduces f0 mean and robot (condition nor robot'S f0) doesnt affect this effect. Intensity is not affected by intimacy.
+
+```{r}
+summary(f1 <- lmer(f0mean ~ intimc + (1  | speaker), dac))
+
+par(mfrow=c(2,2))
+hist(resid(f1))
+qqnorm(resid(f1));qqline(resid(f1))
+plot(fitted(f1), resid(f1))
+```
+
+#### Intensity
+
+```{r}
+summary(i <- lmer(intensMean ~ intimc + (1 | speaker), dac))
+
+par(mfrow=c(2,2))
+hist(resid(i))
+qqnorm(resid(i));qqline(resid(i))
+plot(fitted(i), resid(i))
+```
+
+##### To better compare the effect of intimacy on intensity and f0
+
+
+```{r}
+summary(c <- lmer(intimMean ~ f0meanc + intensMeanC + (1|speaker), dac))
+
+
+par(mfrow=c(2,2))
+hist(resid(c))
+qqnorm(resid(c));qqline(resid(c))
+plot(fitted(c), resid(c))
+
+summary
+```
+
+# Questionnaire ratings
+
+### Means and SDs
+```{r}
+dat <- dac %>%
+  mutate(g = paste0(speaker, condition)) %>% 
+  filter(!grepl("Robot", speaker), !duplicated(g))
+
+# Conversational Quality, Fixed Gaze condition
+mean(dat$PCConvQuality[dat$condition=="NG"]) # mean: 6.97
+sd(dat$PCConvQuality[dat$condition=="NG"]) # SD: 1.24
+
+# Conversational Quality, Gaze Aversion condition
+mean(dat$PCConvQuality[dat$condition=="GA"]) # mean: 6.99
+sd(dat$PCConvQuality[dat$condition=="GA"]) # SD: 1.1
+
+# Evaluation of Robot, Fixed Gaze condition
+mean(dat$PCEvalRobot[dat$condition=="NG"]) # mean: 6.5
+sd(dat$PCEvalRobot[dat$condition=="NG"]) # SD: 1.3
+
+# Evaluation of Robot, Gaze Aversion condition
+mean(dat$PCEvalRobot[dat$condition=="GA"]) # mean: 6.25
+sd(dat$PCEvalRobot[dat$condition=="GA"]) # SD: 1.09
+
+
+##################################
+
+
+# Conversational Quality, Fixed Gaze condition
+mean(dac$PCConvQuality[dac$condition=="NG"]) # mean: 7.11
+sd(dac$PCConvQuality[dac$condition=="NG"]) # SD: 1.21
+
+# Conversational Quality, Gaze Aversion condition
+mean(dac$PCConvQuality[dac$condition=="GA"]) # mean: 7.01
+sd(dac$PCConvQuality[dac$condition=="GA"]) # SD: 1.05
+
+# Evaluation of Robot, Fixed Gaze condition
+mean(dac$PCEvalRobot[dac$condition=="NG"]) # mean: 6.54
+sd(dac$PCEvalRobot[dac$condition=="NG"]) # SD: 1.39
+
+# Evaluation of Robot, Gaze Aversion condition
+mean(dac$PCEvalRobot[dac$condition=="GA"]) # mean: 6.27
+sd(dac$PCEvalRobot[dac$condition=="GA"]) # SD: 1.07
+
+```
+
+
+```{r}
+ggplot(dat, aes(condition, PCConvQuality))+
+  stat_halfeye(adjust = .5,  width = .5, justification = -.2, .width = c(.5, .95), fill="#9bafbd")+
+  geom_boxplot(width=.13, notch = TRUE)
+
+summary(cq1 <- lmer(PCConvQuality ~ condition + (1 |speaker), dat))
+
+par(mfrow=c(2,2))
+plot(fitted(cq1), resid(cq1))
+hist(resid(cq1))
+qqnorm(resid(cq1));qqline(resid(cq1))
+```
+
+
+```{r}
+ggplot(dat, aes(condition, PCEvalRobot))+
+  stat_halfeye(adjust = .5,  width = .5, justification = -.2, .width = c(.5, .95), fill="#9bafbd")+
+  geom_boxplot(width=.13, notch = TRUE)
+
+summary(rq1 <- lmer(PCEvalRobot ~ condition + (1|speaker), dat))
+
+par(mfrow=c(2,2))
+plot(fitted(rq1), resid(rq1))
+hist(resid(rq1))
+qqnorm(resid(rq1));qqline(resid(rq1))
+```
