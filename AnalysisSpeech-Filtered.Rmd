@@ -101,7 +101,8 @@ ggplot(dac, aes(turn, gapDur))+
 
 ```{r}
 dac$condition <- relevel(dac$condition, ref="NG")
-summary(g1 <- lmer(gapDur ~ condition * turn + (1 + condition | speaker), dac))
+summary(g1 <- lmer(gapDur ~ condition : turn + (1 + condition | speaker), dac))
+
 summary(g2 <- lmer(gapDur ~ condition * intimc + (1 + condition | speaker), dac))
 anova(g1, g2)
 ```
@@ -183,7 +184,7 @@ ggplot(dac, aes(robf0meanc, f0mean))+
 
 ```{r}
 dac$condition <- relevel(dac$condition, ref="NG")
-summary(f0 <- lmer(f0mean ~ robf0meanc : condition + (1 + condition | speaker), dac))
+summary(f0 <- lmer(f0mean ~ robf0meanc + (1 | speaker), dac))
 
 par(mfrow=c(2,2))
 hist(resid(f0))
