@@ -465,7 +465,7 @@ dpN <- dac %>%
 names(dpN) <- c("speaker", paste0("I", 1:12))
 dp <- rbind(dpN, dpG)
 
-pc <- principal_components(dp[,2:13], n = 3, threshold = 0.4, standardize = TRUE, rotation="varimax")
+print(pc <- principal_components(dp[,2:13], n = 3, threshold = 0.4, standardize = TRUE, rotation="varimax"))
 summary(pc)
 # write.csv(pc, paste0(folder, "loadings2.csv"))
 
