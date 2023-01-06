@@ -13,6 +13,7 @@ knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(lme4)
 library(ggdist)
+library(mediation)
 
 `%!in%` <- Negate(`%in%`)
 
@@ -84,8 +85,16 @@ dab <- dab %>%
 
 ```{r}
 ggplot(dac, aes(robPrevf0mean, f0mean))+
+  theme_minimal()+
   geom_point()+
-  geom_smooth()
+  geom_smooth()+
+  labs(title="Robot's F0's Influence on Human's F0",
+       y="Human's F0 mean",
+       x="Robot's F0 mean")+
+  theme(title = element_text(size=18))+
+  ylim(70,205)+
+  xlim(74, 200)
+# ggsave(paste0(folder, "RobotHumanF0.png"), units = "px")
 ```
 
 There is a general effect of convergence to the robots. There is also a *condition* effect: people only converge to the robot in the *Gaze Aversion* condition.
@@ -206,12 +215,13 @@ plot(fitted(f1), resid(f1))
 
 ```{r}
 IPUno <- dac %>% 
-  select(speaker, condition, turn) %>% 
+  dplyr::select(speaker, condition, turn) %>% 
   group_by(speaker, condition, turn) %>% 
   mutate(numberIPUs = n()) %>% 
   ungroup() %>% 
   distinct()
 table(IPUno$numberIPUs)
+names(dac)
 ```
 
 ### Intimacy
@@ -227,7 +237,7 @@ summary(f1 <- lmer(f0mean ~ robf0meanc : intimc + (1 | speaker), dac))
 intimacy reduces f0 mean and robot (condition nor robot'S f0) doesnt affect this effect. Intensity is not affected by intimacy.
 
 ```{r}
-summary(f1 <- lmer(f0mean ~ intimc + (1  | speaker), dac))
+summary(f1 <- lmer(f0mean ~ intimc + intensMeanC + (1  | speaker), dac))
 
 par(mfrow=c(2,2))
 hist(resid(f1))
@@ -246,20 +256,21 @@ qqnorm(resid(i));qqline(resid(i))
 plot(fitted(i), resid(i))
 ```
 
-##### To better compare the effect of intimacy on intensity and f0
+##### Mediation analysis (f0 ~ intimacy + intensity)
 
+*(see tutorial here: https://towardsdatascience.com/doing-and-reporting-your-first-mediation-analysis-in-r-2fe423b92171)*
+
+Intimacy does seem to affect f0 directly, independently of intensity.
 
 ```{r}
-summary(c <- lmer(intimMean ~ f0meanc + intensMeanC + (1|speaker), dac))
+summary(fit.totalEffect <- lmer(f0mean ~ intimc + (1|speaker), dac))
+summary(fit.mediator <- lmer(intensMean ~ intimc + (1|speaker), dac))
+summary(fit.both <- lmer(f0mean ~ intimc + intensMeanC + (1|speaker), dac))
 
-
-par(mfrow=c(2,2))
-hist(resid(c))
-qqnorm(resid(c));qqline(resid(c))
-plot(fitted(c), resid(c))
-
-summary
+medResult <- mediate(fit.mediator, fit.both, treat = "intimc", mediator = "intensMeanC", boot=F)
+summary(medResult)
 ```
+
 
 # Questionnaire ratings
 
