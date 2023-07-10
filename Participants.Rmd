@@ -27,6 +27,14 @@ length(dat$Participant) # 33 participants
 summary(dat$Age) # 21 - 56 yo ; median 29 ; M 30.55 ; SD 8.07
 sd(dat$Age)
 table(dat$Education) # 5 HS ; 6 BA ; 22 MA
+ggplot(dat, aes(Age))+
+  geom_histogram()+
+  theme_minimal()+
+  labs(title="Participants' Ages",
+       x="Age",
+       y="")+
+  theme(plot.title = element_text(hjust = 0.5))
+ggsave(filename = paste0(folder, "ages.png"), width=1200, height=1200, units="px")
 ```
 
 ```{r}

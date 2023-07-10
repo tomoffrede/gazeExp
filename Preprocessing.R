@@ -273,7 +273,7 @@ for(s in unique(dat$speaker[grepl("Robot", dat$speaker)])){
     b0 <- dat %>% 
       filter(speaker == s, 
              condition == c) %>%
-      select(c(speaker, IPU, f0mean, f0sd, condition)) %>% 
+      dplyr::select(speaker, IPU, f0mean, f0sd, condition) %>% 
       mutate_at("IPU", as.numeric) %>%
       mutate(overallIPU = 1:n())
     b <- rbind(b, b0)
@@ -285,7 +285,7 @@ dam <- dam %>%
   mutate(prevCond = ifelse(condition == prevCond, NA, prevCond))
 
 dab <- dam %>% filter(task == "Baseline") %>% # Baseline dataset
-  select(-c("turn", "gapDur", "f0Diff")) %>% 
+  dplyr::select(-c("turn", "gapDur", "f0Diff")) %>% 
   mutate_at(c("f0mean", "f0sd", "intensMean", "intensMax"), as.numeric) %>% 
   mutate("robPrevf0mean"=NA, "robPrevf0meanMock"=NA, "robPrevf0sd"=NA, "robPrevf0sdMock"=NA, "humanPrevf0mean"=NA, "humanPrevf0sd"=NA)
 dac <- dam %>% filter(task == "Conversation") %>%  # Conversation dataset
@@ -425,7 +425,7 @@ for(i in 1:nrow(dab)){
 dL <- list(dab, dac)
 for(d in 1:length(dL)){
   dL[[d]] <- dL[[d]] %>% 
-    select(-"groupings")
+    dplyr::select(-"groupings")
 }
 dab <- dL[[1]]
 dac <- dL[[2]]
@@ -437,7 +437,7 @@ dac <- dL[[2]]
 # dac <- dac[!grepl("TMF|BFI|GA|NG|Impairment|Dyslexia|Gender|Education|L1|Age", names(dac))]
 
 q <- read.csv(paste0(folder2, "questions.csv"), header=TRUE, dec=".", sep=";") %>% 
-  select(-Q) %>% 
+  dplyr::select(-Q) %>% 
   group_by(scenario) %>% 
   mutate(turn = 1:n()) %>% 
   ungroup()
@@ -455,12 +455,12 @@ dac <- full_join(dac, q, by=c("scenario", "turn")) %>%
 
 dpG <- dac %>% 
   filter(!grepl("Robot", speaker)) %>%
-  select(speaker, GA.1:GA.12) %>% 
+  dplyr::select(speaker, GA.1:GA.12) %>% 
   distinct()
 names(dpG) <- c("speaker", paste0("I", 1:12))
 dpN <- dac %>% 
   filter(!grepl("Robot", speaker)) %>%
-  select(speaker, NG.1:NG.12) %>% 
+  dplyr::select(speaker, NG.1:NG.12) %>% 
   distinct()
 names(dpN) <- c("speaker", paste0("I", 1:12))
 dp <- rbind(dpN, dpG)
@@ -498,7 +498,7 @@ dac <- dacsave
 
 daq <- dac %>%
   filter(!grepl("Robot", speaker)) %>% 
-  select(speaker, GA.1:NG.12) %>% 
+  dplyr::select(speaker, GA.1:NG.12) %>% 
   distinct() %>%
   gather(key=condition, value=rating, -speaker) %>% 
   mutate(questionNumber = substr(condition, 4, nchar(condition)),
@@ -511,24 +511,24 @@ daq1 <- merge(daq, questionnaire1, by="questionNumber") %>%
   group_by(speaker, condition) %>% 
   mutate(dimensionRating = mean(rating, na.rm=TRUE)) %>%
   ungroup() %>% 
-  select(-questionNumber) %>% 
+  dplyr::select(-questionNumber) %>% 
   spread(key=dimension, value=dimensionRating) %>% 
   spread(key=question, value = rating) %>% 
-  select(1:3)
+  dplyr::select(1:3)
 
 daq2 <- merge(daq, questionnaire2, by="questionNumber") %>%
   group_by(speaker, condition) %>% 
   mutate(dimensionRating = mean(rating, na.rm=TRUE)) %>%
   ungroup() %>% 
-  select(-questionNumber) %>% 
+  dplyr::select(-questionNumber) %>% 
   spread(key=dimension, value=dimensionRating) %>% 
   spread(key=question, value = rating) %>% 
-  select(1:3)
+  dplyr::select(1:3)
 
 daq <- full_join(daq1, daq2, by=c("speaker", "condition"))
 
 dac <- dac %>%
-  select(-c(GA.1:NG.12))
+  dplyr::select(-c(GA.1:NG.12))
 
 # join dac with the questionnaire data
 # and then also reduce the dataset by calculating the TMF scores
@@ -538,7 +538,7 @@ dac <- full_join(dac, daq, by=c("speaker", "condition")) %>%
   mutate(TMF.F = (TMF.F1+TMF.F2+TMF.F3+TMF.F4+TMF.F5+TMF.F6)/6,
          TMF.M = (TMF.M1+TMF.M2+TMF.M3+TMF.M4+TMF.M5+TMF.M6)/6) %>% 
   ungroup() %>% 
-  select(-c(TMF.M1:TMF.F6, scenario))
+  dplyr::select(-c(TMF.M1:TMF.F6, scenario))
 
 # calculate the BFI scores (average of each dimension)
 
@@ -546,7 +546,7 @@ bfi <- read.csv(paste0(folder2, "adjectivesBFI.csv"), sep = ";")
 
 db <- dac %>% 
   filter(!grepl("Robot", speaker)) %>% 
-  select(speaker, BFI1:BFI40) %>% 
+  dplyr::select(speaker, BFI1:BFI40) %>% 
   distinct() %>%
   gather(key=adjNumber, value=rating, -speaker) %>% 
   mutate(adjNumber = substr(adjNumber, 4, nchar(adjNumber)))
@@ -564,7 +564,7 @@ db <- db %>%
   mutate(dimensionBFIRating = mean(rating, na.rm=TRUE)) %>% 
   ungroup() %>% 
   spread(key=dimensionBFI, value=dimensionBFIRating) %>% 
-  select(-c("adjNumber", "rating", "adjectiveBFI", "inverted"))
+  dplyr::select(-c("adjNumber", "rating", "adjectiveBFI", "inverted"))
 
 # the following is to collapse all the rows that should be together (but are right now containing one (correct) value and many NAs)
 
@@ -577,17 +577,17 @@ db <- db %>%
   summarise_all(coalesce_by_column)
 
 dac <- merge(dac, db, by="speaker", all=TRUE) %>% 
-  select(-c(BFI1:BFI40, X))
+  dplyr::select(-c(BFI1:BFI40, X))
 
 # also transform the questionnaire data in the dab dataset into something meaningful like you did for dac
 
 info <- dac %>% 
-  select(speaker, condition, PCConvQuality, PCEvalRobot, TMF.F, TMF.M, Agreeableness, Conscientiousness, EmotionalStability, Extraversion, IntellectOpenness) %>% 
+  dplyr::select(speaker, condition, PCConvQuality, PCEvalRobot, TMF.F, TMF.M, Agreeableness, Conscientiousness, EmotionalStability, Extraversion, IntellectOpenness) %>% 
   distinct() %>% 
   filter(!grepl("Robot", speaker))
 
 dab <- dab %>% 
-  select(-c("X", "GA.1":"NG.12", "TMF.M1":"BFI40"))
+  dplyr::select(-c("X", "GA.1":"NG.12", "TMF.M1":"BFI40"))
 
 dab <- full_join(dab, info, by=c("speaker", "condition"))
 

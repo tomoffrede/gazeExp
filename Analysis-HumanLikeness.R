@@ -9,7 +9,7 @@ library(ggdist)
 folder <- "C:/Users/offredet/Documents/1HU/ExperimentEyes/Data/"
 files <- list.files(folder)
 
-h <- read.csv(paste0(folder, files[grepl("metadata", files)])) %>% 
+h <- read.csv(paste0(folder, files[grepl("metadata", files)]), sep=";") %>% 
   select(-c(GA.1:GA.4, GA.9:GA.12, NG.1:NG.4, NG.9:NG.12, BFI1:BFI40, TMF.M1:TMF.F6)) %>% 
   mutate_at("Order", as.factor)
 
@@ -123,7 +123,7 @@ summary(lm(rating ~ Order, h2 %>% filter(item == "feel")))
 # the plot shows what should be a clear trend of higher ratings for GA-first participants
 #  but the regression really doesn't show anything
 
-# and now overall (not the average rating, but all the ratings taking separately but in the same dataset)
+# and now overall (not the average rating, but all the ratings taken separately but in the same dataset)
 ggplot(h2, aes(Order, rating))+
   geom_boxplot()
 summary(lm(rating ~ Order, h2))

@@ -5,9 +5,9 @@ library(rPraat)
 library(tidyverse)
 `%!in%` <- Negate(`%in%`)
 
-folder <- "C:/Users/offredet/Documents/1HU/ExperimentEyes/Data/All/"
-folderIPUs <- "C:/Users/offredet/Documents/1HU/ExperimentEyes/Data/IPU150/"
-folderNew <- "C:/Users/offredet/Documents/1HU/ExperimentEyes/Data/NewTGs/"
+folder <- "C:/Users/offredet/Documents/1HU/ExperimentEyes/Data/temp/"
+folderIPUs <- "C:/Users/offredet/Documents/1HU/ExperimentEyes/Data/OneChannelFiltered/IPU/"
+folderNew <- "C:/Users/offredet/Documents/1HU/ExperimentEyes/Data/OneChannelFiltered/All/"
 
 f <- list.files(folder, "TextGrid")
 fipu <- list.files(folderIPUs, "TextGrid")

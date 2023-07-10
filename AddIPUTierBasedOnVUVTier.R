@@ -5,8 +5,8 @@
 library(tidyverse)
 library(rPraat)
 
-folder <- "C:/Users/offredet/Documents/1HU/ExperimentEyes/Data/AllVUV/"
-folderIPU <- "C:/Users/offredet/Documents/1HU/ExperimentEyes/Data/IPU350/"
+folder <- "C:/Users/offredet/Documents/1HU/ExperimentEyes/Data/OneChannelFiltered/All/"
+folderIPU <- "C:/Users/offredet/Documents/1HU/ExperimentEyes/Data/OneChannelFiltered/IPU/"
 files <- list.files(folder, "VUV")
 
 pause <- 0.35

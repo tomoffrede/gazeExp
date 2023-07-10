@@ -2,7 +2,11 @@
 title: "FinalModels-ICPhS"
 author: "Tom Offrede"
 date: "2022-12-09"
-output: html_document
+output:
+  html_document:
+    toc: true
+    toc_float: 
+      collapsed: false
 ---
 
 ```{r setup, include=FALSE}
@@ -11,7 +15,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r, include=FALSE}
 library(tidyverse)
-library(lme4)
+library(lmerTest)
 library(ggdist)
 library(mediation)
 
@@ -79,9 +83,9 @@ dab <- dab %>%
   ungroup()
 ```
 
-### Robot's effect on convergence
+# Robot's effect on convergence
 
-#### f0 mean
+## f0 mean
 
 ```{r}
 ggplot(dac, aes(robPrevf0mean, f0mean))+
@@ -97,7 +101,22 @@ ggplot(dac, aes(robPrevf0mean, f0mean))+
 # ggsave(paste0(folder, "RobotHumanF0.png"), units = "px")
 ```
 
-There is a general effect of convergence to the robots. There is also a *condition* effect: people only converge to the robot in the *Gaze Aversion* condition.
+```{r}
+ggplot(dac, aes(robPrevf0mean, f0mean))+
+  theme_minimal()+
+  geom_point()+
+  geom_smooth(method="lm")+
+  labs(title="Robot's F0's Influence on Human's F0",
+       y="Human's F0 mean",
+       x="Robot's F0 mean")+
+  theme(title = element_text(size=18))+
+  ylim(70,205)+
+  xlim(74, 200)+
+  facet_wrap(~speaker)
+# ggsave(paste0(folder, "RobotHumanF0-Individual.png"), units = "px", width=3500, height=2159)
+```
+
+There is a general effect of synchrony to the robots. There might also be a *condition* effect: people only converge to the robot in the *Gaze Aversion* condition, but the AIC of the models suggests that the model without *condition* is better. There might also be a *convergence* effect: adding "turn" as an interacting predictor also gives a significant model, but, again, AIC comparison suggests the simpler model is better.
 
 ```{r}
 summary(f1 <- lmer(f0mean ~ robf0meanc + (1 | speaker), dac))
@@ -105,13 +124,22 @@ summary(f1 <- lmer(f0mean ~ robf0meanc + (1 | speaker), dac))
 summary(f2 <- lmer(f0mean ~ robf0meanc : condition + (1 | speaker), dac)) # no random slopes so that this model is comparable with the one above
 anova(f1, f2)
 
+summary(f3 <- lmer(f0mean ~ robf0meanc : turn + (1 | speaker), dac))
+anova(f1, f3)
+
 par(mfrow=c(2,2))
 hist(resid(f1))
 qqnorm(resid(f1));qqline(resid(f1))
 plot(fitted(f1), resid(f1))
 ```
 
-#### f0 mean plots
+### R^2^ (marginal and conditional)
+
+```{r}
+MuMIn::r.squaredGLMM(f1)
+```
+
+## f0 mean plots
 
 ```{r}
 # dat <- dac %>%
@@ -229,7 +257,7 @@ names(dac)
 #### Convergence
 
 ```{r}
-summary(f1 <- lmer(f0mean ~ robf0meanc : intimc + (1 | speaker), dac))
+summary(f1i <- lmer(f0mean ~ robf0meanc : intimc + (1 | speaker), dac))
 ```
 
 #### f0 mean
@@ -237,7 +265,9 @@ summary(f1 <- lmer(f0mean ~ robf0meanc : intimc + (1 | speaker), dac))
 intimacy reduces f0 mean and robot (condition nor robot'S f0) doesnt affect this effect. Intensity is not affected by intimacy.
 
 ```{r}
-summary(f1 <- lmer(f0mean ~ intimc + intensMeanC + (1  | speaker), dac))
+summary(f1 <- lmer(f0mean ~ intimc + (1  | speaker), dac))
+summary(f2 <- lmer(f0mean ~ intimc : condition + (1  | speaker), dac))
+anova(f1, f2)
 
 par(mfrow=c(2,2))
 hist(resid(f1))
@@ -258,14 +288,28 @@ plot(fitted(i), resid(i))
 
 ##### Mediation analysis (f0 ~ intimacy + intensity)
 
+
+```{r}
+ggplot(dac, aes(intimMean, f0mean))+
+  theme_minimal()+
+  geom_point()+
+  geom_smooth(method="lm")+
+  labs(title="Intimacy and F0",
+       y="F0 mean",
+       x="Intimacy Ratings")+
+  theme(title = element_text(size=18))
+ggsave(filename = paste0(folder, "intimacy-f0.png"), units = "px")
+```
+
+
 *(see tutorial here: https://towardsdatascience.com/doing-and-reporting-your-first-mediation-analysis-in-r-2fe423b92171)*
 
 Intimacy does seem to affect f0 directly, independently of intensity.
 
 ```{r}
-summary(fit.totalEffect <- lmer(f0mean ~ intimc + (1|speaker), dac))
-summary(fit.mediator <- lmer(intensMean ~ intimc + (1|speaker), dac))
-summary(fit.both <- lmer(f0mean ~ intimc + intensMeanC + (1|speaker), dac))
+summary(fit.totalEffect <- lme4::lmer(f0mean ~ intimc + (1|speaker), dac))
+summary(fit.mediator <- lme4::lmer(intensMean ~ intimc + (1|speaker), dac))
+summary(fit.both <- lme4::lmer(f0mean ~ intimc + intensMeanC + (1|speaker), dac))
 
 medResult <- mediate(fit.mediator, fit.both, treat = "intimc", mediator = "intensMeanC", boot=F)
 summary(medResult)
@@ -321,8 +365,14 @@ sd(dac$PCEvalRobot[dac$condition=="GA"]) # SD: 1.07
 
 ```{r}
 ggplot(dat, aes(condition, PCConvQuality))+
+  theme_minimal()+
   stat_halfeye(adjust = .5,  width = .5, justification = -.2, .width = c(.5, .95), fill="#9bafbd")+
-  geom_boxplot(width=.13, notch = TRUE)
+  geom_boxplot(width=.13, notch = TRUE)+
+  scale_x_discrete(labels=c("Gaze Aversion", "Fixed Gaze"))+
+  labs(title="Conversational Quality",
+       x="",
+       y="Ratings")
+# ggsave(paste0(folder, "convQual.png"))
 
 summary(cq1 <- lmer(PCConvQuality ~ condition + (1 |speaker), dat))
 
@@ -335,8 +385,14 @@ qqnorm(resid(cq1));qqline(resid(cq1))
 
 ```{r}
 ggplot(dat, aes(condition, PCEvalRobot))+
+  theme_minimal()+
   stat_halfeye(adjust = .5,  width = .5, justification = -.2, .width = c(.5, .95), fill="#9bafbd")+
-  geom_boxplot(width=.13, notch = TRUE)
+  geom_boxplot(width=.13, notch = TRUE)+
+  scale_x_discrete(labels=c("Gaze Aversion", "Fixed Gaze"))+
+  labs(title="Evaluation of Robot",
+       x="",
+       y="Ratings")
+# ggsave(paste0(folder, "evalRobot.png"))
 
 summary(rq1 <- lmer(PCEvalRobot ~ condition + (1|speaker), dat))
 
@@ -345,3 +401,10 @@ plot(fitted(rq1), resid(rq1))
 hist(resid(rq1))
 qqnorm(resid(rq1));qqline(resid(rq1))
 ```
+
+# Session Info
+
+```{r}
+sessionInfo()
+```
+

@@ -7,12 +7,14 @@ library(tidyverse)
 folder <- "C:/Users/offredet/Documents/1HU/ExperimentEyes/Data/All/"
 folderPauses <- "C:/Users/offredet/Documents/1HU/ExperimentEyes/Data/TextGridsPauses/"
 folderTurns <- "C:/Users/offredet/Documents/1HU/ExperimentEyes/Data/TextGridsTurns/"
+folderIPUs <- "C:/Users/offredet/Documents/1HU/ExperimentEyes/Data/IPU350/"
 
 f <- list.files(folder, "TextGrid")
 # fP <- f[grepl("pauses", f)] # pause annotations
 # fT <- f[!grepl("pauses", f)] # turn annotations
-fT0 <- f # turn annotations also containing old pause measurements
-fP <- list.files(folderPauses, "TextGrid")
+# fT0 <- f # turn annotations also containing old pause measurements
+# fP <- list.files(folderPauses, "TextGrid")
+fipu <- list.files(folderIPUs, "TextGrid")
 
 # since the files in fT0 contain a tier with old pause measurements, let's first remove this tier
 # and then we'll save these textgrids as the "turns" textgrids in a different folder
@@ -25,7 +27,7 @@ fP <- list.files(folderPauses, "TextGrid")
 # }
 # done
 
-fT <- list.files(folderTurns, "TextGrid")
+# fT <- list.files(folderTurns, "TextGrid")
 
 files <- data.frame(cbind(fT, fP)) %>%
   mutate(worked = ifelse(substr(fT, 1, 9)==substr(fP, 1, 9), "worked!", "NO!!!!"))
