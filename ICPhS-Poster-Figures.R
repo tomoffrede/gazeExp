@@ -56,36 +56,113 @@ dac <- dac %>%
          IPUDurC = IPUDur - mean(IPUDur, na.rm=TRUE)) #%>% 
 # filter(scoreEN > 60) # see with and without low-level participants
 
-theme_set(theme_minimal(base_size = 20)+
-            theme(panel.grid.major = element_blank()))
+theme_set(theme_minimal()+
+            theme(panel.grid.major = element_blank(),
+                  plot.title = element_text(size=30, hjust=0.5),
+                  axis.title = element_text(size=26),
+                  axis.text = element_text(size=10),
+                  strip.text = element_text(size = 22, color="black")))
 
 ###############################################
 
-# General f0 effect
+# f0 convergence
+
+## general
 
 ggplot(dac, aes(robPrevf0mean, f0mean))+
   geom_point()+
   geom_smooth(method="lm")+
-  labs(title="Robot's f0 Influence on Humans' f0",
+  labs(title="Robot f0's Influence on Human f0",
        x = "Robot's f0 mean",
        y = "Humans' f0 mean")
-ggsave(file=paste0(folderFig, "speakers-conv.png"), height=5000, width=5000, units = "px")
-folder2 <- "C:/Users/offredet/Documents/1HU/ExperimentEyes/Data/"
+ggsave(file=paste0(folderFig, "convGeneral.png"))
+# , height=5000, width=5000, units = "px"
 
-# Ratings per condition
+## individual examples
+d <- dac %>% 
+  filter(speaker%in%c("NLF", "UPR")) %>% 
+  mutate(speaker=ifelse(speaker=="NLF", "Speaker 1", "Speaker 2"))
+
+ggplot(d, aes(robPrevf0mean, f0mean))+
+  geom_point()+
+  geom_smooth(method="lm")+
+  labs(title="Individual Variability!",
+       x = "Robot's f0 mean",
+       y = "Human's f0 mean")+
+  facet_wrap(~speaker)
+ggsave(file=paste0(folderFig, "convIdividual.png"))
+
+
+
+###########
+
+# Questionnaire ratings
+
 r <- dac %>% 
   filter(!duplicated(paste0(speaker, condition))) %>%
   dplyr::select(speaker, condition, PCConvQuality, PCEvalRobot) %>%
   pivot_longer(PCConvQuality:PCEvalRobot, names_to = "PC", values_to="rating")
 
 ggplot(r, aes(PC, rating, color=condition))+
-  geom_boxplot()+
+  geom_boxplot(notch=TRUE)+
   labs(title="Humans' Ratings of Robots",
        x = "",
        y = "Rating",
        color = "Condition")+
   scale_x_discrete(labels= c("Conv. Quality", "Eval. of Robot"))+
-  scale_color_manual(labels = c("Gaze Aversion", "Fixed Gaze"), values=c("#365C8DFF", "#1FA187FF"))
+  scale_color_manual(labels = c("Gaze Aversion", "Fixed Gaze"), values=c("#365C8DFF", "#1FA187FF"))+
+  theme(axis.text.x = element_text(color="black", size=20))
 #46337EFF
-ggsave(file=paste0(folderFig, "speakers-conv.png"), height=5000, width=5000, units = "px")
-folder2 <- "C:/Users/offredet/Documents/1HU/ExperimentEyes/Data/"
+ggsave(file=paste0(folderFig, "questionnaire.png"))
+
+ggplot(r %>% filter(PC=="PCConvQuality"), aes(condition, rating))+
+  geom_boxplot(notch=TRUE, width=.13)+
+  stat_halfeye(adjust = .5,  width = .5, justification = -.2, .width = c(.5, .95), fill="#9bafbd")+
+  labs(title="Conversational Quality",
+       x = "",
+       y = "Rating (higher: more positive)")+
+  scale_x_discrete(labels= c("Gaze Aversion", "Fixed Gaze"))+
+  theme(axis.text.x = element_text(color="black", size=20))
+ggsave(file=paste0(folderFig, "convQual.png"))
+
+ggplot(r %>% filter(PC=="PCEvalRobot"), aes(condition, rating))+
+  geom_boxplot(notch=TRUE, width=.13)+
+  stat_halfeye(adjust = .5,  width = .5, justification = -.2, .width = c(.5, .95), fill="#9bafbd")+
+  labs(title="Evaluation of Robot",
+       x = "",
+       y = "Rating (higher: more positive)")+
+  scale_x_discrete(labels= c("Gaze Aversion", "Fixed Gaze"))+
+  theme(axis.text.x = element_text(color="black", size=20))
+ggsave(file=paste0(folderFig, "evalRobot.png"))
+
+###########
+
+# f0 and intimacy
+
+i <- dac %>% 
+  mutate(intimMean = case_when(
+    intimMean>1.19 & intimMean<1.12 ~ (9/12)*1,
+    intimMean>1.82 & intimMean<1.83 ~ (9/12)*2,
+    intimMean>1.83 & intimMean<1.84 ~ (9/12)*3,
+    intimMean>1.97 & intimMean<2 ~ (9/12)*4,
+    intimMean>3 & intimMean<3.1 ~ (9/12)*5,
+    intimMean>3.5 & intimMean<3.6 ~ (9/12)*6,
+    intimMean>4 & intimMean<4.1 ~ (9/12)*7,
+    intimMean>4.3 & intimMean<4.4 ~ (9/12)*8,
+    intimMean>5.2 & intimMean<5.3 ~ (9/12)*9,
+    intimMean>5.4 & intimMean<5.5 ~ (9/12)*10,
+    intimMean>6.5 & intimMean<6.6 ~ (9/12)*11,
+    intimMean>7 & intimMean<7.1 ~ (9/12)*12
+  ))
+
+ggplot(i, aes((intimMean), f0mean))+
+  stat_halfeye(adjust = .5,  width = .5, justification = -.2, .width = c(.5, .95), fill="#9bafbd")+
+  geom_smooth(method="lm")+
+  labs(title="Intimacy and f0",
+       x = "Question's Intimacy",
+       y = "f0 mean")
+ggsave(file=paste0(folderFig, "f0-intimacy.png"))
+
+###########
+
+
