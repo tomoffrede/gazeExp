@@ -6,6 +6,8 @@ library(lme4)
 library(ggdist)
 library(mediation)
 library(viridis)
+library(ggpubr)
+library(grid)
 
 `%!in%` <- Negate(`%in%`)
 
@@ -72,27 +74,29 @@ theme_set(theme_minimal()+
 ggplot(dac, aes(robPrevf0mean, f0mean))+
   geom_point()+
   geom_smooth(method="lm")+
-  labs(title="Robot f0's Influence on Human f0",
+  labs(title="Overall Effect",
        x = "Robot's f0 mean",
        y = "Humans' f0 mean")
-ggsave(file=paste0(folderFig, "convGeneral.png"))
-# , height=5000, width=5000, units = "px"
+ggsave(file=paste0(folderFig, "convGeneral.png"), height=2206, width=2103, units = "px", dpi="print")
+
 
 ## individual examples
 d <- dac %>% 
   filter(speaker%in%c("NLF", "UPR")) %>% 
   mutate(speaker=ifelse(speaker=="NLF", "Speaker 1", "Speaker 2"))
 
-ggplot(d, aes(robPrevf0mean, f0mean))+
+ggplot(d %>% filter(f0mean<174 & f0mean>90), aes(robPrevf0mean, f0mean))+
   geom_point()+
-  geom_smooth(method="lm")+
-  labs(title="Individual Variability!",
+  geom_smooth(data=d, method="lm")+
+  labs(title="Large Individual Variability!",
        x = "Robot's f0 mean",
        y = "Human's f0 mean")+
-  facet_wrap(~speaker)
-ggsave(file=paste0(folderFig, "convIdividual.png"))
-
-
+  facet_wrap(~speaker)+
+  theme(plot.title = element_text(size=27),
+        axis.title = element_text(size=24),
+        axis.text = element_text(size=9),)
+ggsave(file=paste0(folderFig, "individual.png"), height=2378, width=2103, units = "px", dpi="print")
+# 2206
 
 ###########
 
@@ -105,35 +109,43 @@ r <- dac %>%
 
 ggplot(r, aes(PC, rating, color=condition))+
   geom_boxplot(notch=TRUE)+
-  labs(title="Humans' Ratings of Robots",
+  labs(title="Questionnaire Ratings",
        x = "",
-       y = "Rating",
+       y = "Rating (higher: more positive)",
        color = "Condition")+
   scale_x_discrete(labels= c("Conv. Quality", "Eval. of Robot"))+
   scale_color_manual(labels = c("Gaze Aversion", "Fixed Gaze"), values=c("#365C8DFF", "#1FA187FF"))+
   theme(axis.text.x = element_text(color="black", size=20))
 #46337EFF
-ggsave(file=paste0(folderFig, "questionnaire.png"))
+ggsave(file=paste0(folderFig, "questionnaire.png"), height=2206, width=2103, units = "px", dpi="print")
 
-ggplot(r %>% filter(PC=="PCConvQuality"), aes(condition, rating))+
-  geom_boxplot(notch=TRUE, width=.13)+
-  stat_halfeye(adjust = .5,  width = .5, justification = -.2, .width = c(.5, .95), fill="#9bafbd")+
-  labs(title="Conversational Quality",
-       x = "",
-       y = "Rating (higher: more positive)")+
-  scale_x_discrete(labels= c("Gaze Aversion", "Fixed Gaze"))+
-  theme(axis.text.x = element_text(color="black", size=20))
-ggsave(file=paste0(folderFig, "convQual.png"))
+(c <- ggplot(r %>% filter(PC=="PCConvQuality"), aes(condition, rating))+
+    geom_boxplot(notch=TRUE, width=.13)+
+    stat_halfeye(adjust = .5,  width = .5, justification = -.2, .width = c(.5, .95), fill="#9bafbd")+
+    labs(title="Conversational Quality",
+         x = "",
+         y = "Ratings (higher: more positive)")+
+    scale_x_discrete(labels= c("Gaze Aversion", "Fixed Gaze"))+
+    theme(axis.text.x = element_text(color="black", size=20),
+          panel.border = element_rect(colour = "black", fill=NA, size=1)))
+# ggsave(file=paste0(folderFig, "convQual.png"), height=2206, width=2103, units = "px", dpi="print")
 
-ggplot(r %>% filter(PC=="PCEvalRobot"), aes(condition, rating))+
-  geom_boxplot(notch=TRUE, width=.13)+
-  stat_halfeye(adjust = .5,  width = .5, justification = -.2, .width = c(.5, .95), fill="#9bafbd")+
-  labs(title="Evaluation of Robot",
-       x = "",
-       y = "Rating (higher: more positive)")+
-  scale_x_discrete(labels= c("Gaze Aversion", "Fixed Gaze"))+
-  theme(axis.text.x = element_text(color="black", size=20))
-ggsave(file=paste0(folderFig, "evalRobot.png"))
+# (c2 <- ggarrange(c))
+# grid.rect(width = .98, height = .98, gp = gpar(lwd = 1, col = "black", fill = NA))
+
+(e <- ggplot(r %>% filter(PC=="PCEvalRobot"), aes(condition, rating))+
+    geom_boxplot(notch=TRUE, width=.13)+
+    stat_halfeye(adjust = .5,  width = .5, justification = -.2, .width = c(.5, .95), fill="#9bafbd")+
+    labs(title="Evaluation of Robot",
+         x = "",
+         y = "Ratings (higher: more positive)")+
+    scale_x_discrete(labels= c("Gaze Aversion", "Fixed Gaze"))+
+    theme(axis.text.x = element_text(color="black", size=20),
+          axis.text = element_text(size=11)))
+ggsave(file=paste0(folderFig, "evalRobot.png"), height=2206, width=2103, units = "px", dpi="print")
+
+(q <- ggarrange(c, e))
+ggsave(file=paste0(folderFig, "questionnaire2.png"), height=2206, width=2103, units = "px", dpi="print")
 
 ###########
 
@@ -161,7 +173,7 @@ ggplot(i, aes((intimMean), f0mean))+
   labs(title="Intimacy and f0",
        x = "Question's Intimacy",
        y = "f0 mean")
-ggsave(file=paste0(folderFig, "f0-intimacy.png"))
+ggsave(file=paste0(folderFig, "f0-intimacy.png"), height=2206, width=2103, units = "px", dpi="print")
 
 ###########
 
