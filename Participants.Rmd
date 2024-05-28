@@ -10,11 +10,12 @@ folder <- "C:/Users/offredet/Documents/1HU/ExperimentEyes/Data/"
 meta <- list.files(folder, "metadata")
 
 dat <- read.csv(paste0(folder, meta), sep=";") %>%
-  select("Participant", "Age", "Gender", "HearingImpairment", "SpeechImpairment", "Dyslexia", "VisionImpairment", "Education", "L1", "TMF.M1":"TMF.F6", "scoreEN") %>%
+  select("Participant", "Order", "Age", "Gender", "HearingImpairment", "SpeechImpairment", "Dyslexia", "VisionImpairment", "Education", "L1", "TMF.M1":"TMF.F6", "scoreEN") %>%
   mutate(TMF.M = (TMF.M1 + TMF.M2 + TMF.M3 + TMF.M4 + TMF.M5 + TMF.M6) / 6,
          TMF.F = (TMF.F1 + TMF.F2 + TMF.F3 + TMF.F4 + TMF.F5 + TMF.F6) / 6) %>%
   mutate_at(c("TMF.M", "TMF.F"), as.numeric) %>%
   select(-c("TMF.M1":"TMF.F6"))
+write.csv(dat, file=paste0(folder, "metadata-clean.csv"))
 ```
 
 
